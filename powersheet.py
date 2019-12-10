@@ -1,13 +1,8 @@
-# search input without /'s
-# turn new build into a list (break at spaces)
-# search column for each list entry
-# compare list entries
-# if adjacent matches, remove one
-# print members, separated by slashes
-
-
 from datetime import date
 from openpyxl import load_workbook
+import requests
+from lxml import html
+from bs4 import BeautifulSoup
 import getpass
 import os
 import sys
@@ -26,43 +21,141 @@ print('FIXME: Change current date variable back.....')
 print('FIXME: Used 12-02-2019 for testing purposes\n\n')
 
 
-
+print("************-| LD_50 Locomotive Powersheet Mutilator |-**************")
 def menu():
-    print("************-| LD_50 Locomotive Powersheet Mutilator |-**************")
-    print()
 
     choice = input("""
+                
                 A: Inbound and Outbound Report
                 B: Outbound Trains
                 C: Change Powersheet
                 D: Save Powersheet
                 E: Rob Peter
                 F: Pay Paul
-                G: Make Work Packets
+                G: Search for open engines
+                H: Identify shoppers
+                I: Make Work Packets
+                J: Scrape Unit Information
 
 
                 Q: Quit/Log Out
 
                 Please enter your choice: """)
 
-    if choice == "A" or choice =="a":
+    if choice == "A" or choice == "a":
         dispatchReport()
-    elif choice == "B" or choice =="b":
+    elif choice == "B" or choice == "b":
         fromBuilt()
-    elif choice == "C" or choice =="c":
+    elif choice == "C" or choice == "c":
         appendBuild()
-    elif choice=="D" or choice=="d":
+    elif choice == "D" or choice == "d":
         savePowersheet()
-    elif choice=="E" or choice=="e":
+    elif choice == "E" or choice == "e":
         robPeter()
-    elif choice=="F" or choice=="f":
+    elif choice == "F" or choice == "f":
         payPaul()
-    elif choice=="Q" or choice=="q":
+    elif choice == 'G' or choice == 'g':
+        openEngines()
+    elif choice == 'H' or choice == 'h':
+        shoppers()
+    elif choice == 'I' or choice == 'i':
+        createPackets()
+    elif choice == 'J' or choice == 'j':
+        scrape()
+    elif choice == "Q" or choice == "q":
         sys.exit
     else:
-        print("You must only select either A,B,C,D,E,F or Q.")
-        print("Please try again")
+        print("You must only select either A,B,C,D,E,F,G or Q.")
+        print("Please try again\n")
         menu()
+
+
+
+def scrape():
+    USERNAME = input('LMIS Username: ')
+    PASSWORD = getpass.getpass('LMIS Password: ')
+
+    print('LD_50 Scrape')
+    print('Author: Sean Robinson, SGL, Enola Diesel')
+    print('Welcome to the LMIS Scraper...\n')
+
+    UNIT_NUMBERS = input('Enter locomotive numbers separated by a space: ')
+    UNIT_LIST = UNIT_NUMBERS.split(" ")
+
+    # login page for LMIS
+    LOGIN_URL = "https://www2.nscorp.com/mech0000/login.lmis"
+
+    payload = {
+        "username": USERNAME, 
+        "pass1": PASSWORD, 
+    #   LMIS does not require a token so this is not needed
+    #   "csrfmiddlewaretoken": authenticity_token
+    }
+
+    URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=0000009952&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="    
+    
+    # keeps us logged into the session
+    session_requests = requests.session()
+    result = session_requests.get(LOGIN_URL)
+
+    tree = html.fromstring(result.text)
+    
+    # Login
+    result = session_requests.post(LOGIN_URL, data = payload, headers = dict(referer = LOGIN_URL))
+     
+    # Loop over the input list and scrape the work orders
+    for x in UNIT_LIST:
+    
+        SCRAPE_URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="
+        result = session_requests.get(SCRAPE_URL, headers = dict(referer = SCRAPE_URL))
+        #with open("/home/robbie/Code/Work/"+x+".html", 'wb') as file:
+        #    file.write(result.content)
+
+        soup = BeautifulSoup(result.content, 'lxml')
+
+        # add PTC health when able
+        # add DP also
+
+        print('FIXME: add ptc health to end of PTC line...add DP to report\n\n')
+        print('----',x,'----')
+        if (soup.find("input", {"name":"hModel"})) is not None:
+            model = soup.find("input", {"name":"hModel"})['value']
+            print('Model: ' + model)
+        if (soup.find("input", {"name":"hPtc"})) is not None:
+            ptc = soup.find("input", {"name":"hPtc"})['value']
+            print('PTC: ' + ptc)
+        if (soup.find("input", {"name":"hEM"})) is not None:
+            em = soup.find("input", {"name":"hEM"})['value']
+            print('EM: ' + em)
+        if (soup.find("input", {"name":"hCs"})) is not None:
+            cabs = soup.find("input", {"name":"hCs"})['value']
+            print('CS: ' + cabs)
+        if (soup.find("input", {"name":"hLSL"})) is not None:
+            lsl = soup.find("input", {"name":"hLSL"})['value']
+            print('LSL: ' + lsl)
+        if (soup.find("input", {"name":"hRelIu"})) is not None:
+            relInd = soup.find("input", {"name":"hRelIu"})['value']
+            print('Reliability: ' + relInd)
+        if (soup.find("input", {"name":"hEquivAxl"})) is not None:
+            group = soup.find("input", {"name":"hEquivAxl"})['value']
+            print('Power Group: ' + group)
+        if (soup.find("input", {"name":"hPropDue"})) is not None:
+            fra = soup.find("input", {"name":"hPropDue"})['value']
+            print('FRA Due: ' + fra)
+        if (soup.find("input", {"name":"hEpaDead"})) is not None:
+            epa = soup.find("input", {"name":"hEpaDead"})['value']
+            print('EPA Due: ' + epa)
+        if (soup.find("input", {"name":"hLubeDue"})) is not None:
+            lube = soup.find("input", {"name":"hLubeDue"})['value']
+            print('Lube Due: ' + lube)
+        if (soup.find("input", {"name":"hCabS"})) is not None:
+            csDue = soup.find("input", {"name":"hCabS"})['value']
+            print('Cab Signals Due: ' + csDue)
+        if (soup.find("input", {"name":"hFc"})) is not None:
+            fuelCap = soup.find("input", {"name":"hFc"})['value']
+            print('Fuel Capacity: ' + fuelCap)
+ 
+    menu()
 
 def writeMultColumns(row, column1, column2, robbed, paid):
     
@@ -102,7 +195,37 @@ def readMultColumns(rowStart, rowEnd, colStart, colEnd):
         if x is None and z is not None:
             print(x,z)
         elif x is not None:
-            print(x[:3],z)
+            print(x[:3],'-->',z)
+
+def openEngines():
+    print('\nSearching for Open Locomotives on Current Sheet.....')
+    
+    inboundUnits=[]
+    for rows in range (4, 27):
+        row = curSheet.cell(row=rows, column = 3).value
+        if row is not None:
+            rowSlicer = row.split()
+            slash = '/'
+            while slash in rowSlicer: rowSlicer.remove(slash)
+            newList = [s[:4] for s in rowSlicer if s[:3].isdigit()]
+            inboundUnits.extend(newList)
+    usedUnits=[]
+    for rows in range(4, 27):
+        row = curSheet.cell(row=rows, column=14).value
+        if row is not None:
+            rowSlicer = row.split()
+            slash = '/'
+            while slash in rowSlicer: rowSlicer.remove(slash)
+            newList = [s[:4] for s in rowSlicer if s[:3].isdigit()]
+            usedUnits.extend(newList)
+
+    openUnits = [s for s in inboundUnits if s not in usedUnits]
+    print('Search complete...\n\nOpen Locomtovies:',openUnits,'\n')
+    menu()
+            
+def createPackets():
+    print('FIXME: Use this function to create cover sheet based on MI/UR and LMIS scrape information')       
+    menu()
 
 def robPeter():
     print('\n|--------------- Robbing Peter ---------------|\n')
@@ -111,7 +234,7 @@ def robPeter():
     stolenUnits = input('What units are being stolen?  ')
 
     stolenList = stolenUnits.split()
-    print(stolenList)
+    #print(stolenList)
     
     payTrain = input('What train are we paying '+stolenTrain+' to? (ex. 15T - OUTBOUND)  ')
 
@@ -133,8 +256,8 @@ def robPeter():
             print(checkTrain,':',checkUnits)
             break
 
-    print('How many units will be needed to replace robbed power?')
-    needed=input('If unknown, enter the amount of units stolen (NEED X).  ')
+    #print('How many units will be needed to replace robbed power?')
+    needed=input('How many units will be needed to replace robbed power? (NEED X)  ')
     
     #check for empty rows in the outbound extras 
     for train in range(15, 28):
@@ -169,6 +292,12 @@ def payPaul():
     print('Repaid check')
 
     dispatchReport()
+
+def shoppers():
+    shoppers = input('\nEnter shopped units coming in: ')
+    print(shoppers)
+    print('FIXME: Use this function to color shoppers red and add them to the assignemnts sheets')
+    menu()
 
 def searchPower(newPower, fromRow):
     power = [x.strip() for x in newPower.split('/')]
@@ -274,6 +403,7 @@ def fromBuilt():
         a = curSheet.cell(row=i, column=21).value
         print(y,': ',z, '-->',a)
         #print('----: ',a,'\n')
+    print('\n')
     menu()
 
 def savePowersheet():

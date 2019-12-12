@@ -8,17 +8,20 @@ import os
 import sys
 
 #os.chdir('/home/robbie/Code/Work/excel/')
-wb = load_workbook(filename = 'Powersheet_Template2.xlsx')
+#wb = load_workbook(filename = 'Powersheet_Template2.xlsx')
+
 today = date.today()
 curDate = today.strftime("%m-%d-%Y")
-curDate = '12-02-2019'
-curSheet = wb[curDate]
+
+#curDate = '12-02-2019'
+
 fromList = ' '
+wb = load_workbook(filename = 'Enola_Powersheet_'+curDate+'.xlsx')
+curSheet = wb[curDate]
 
 print('Currently working with the',curDate,'worksheet...')
 print('At the moment this is only being built for C-trick\n\n')
-print('FIXME: Change current date variable back.....')
-print('FIXME: Used 12-02-2019 for testing purposes\n\n')
+print('Add a turnover function to automatically fill that out')
 
 
 print("************-| LD_50 Locomotive Powersheet Mutilator |-**************")
@@ -71,8 +74,8 @@ def menu():
 
 
 
-def scrape():
-    USERNAME = input('LMIS Username: ')
+def createPackets():
+    USERNAME = input('\nLMIS Username: ')
     PASSWORD = getpass.getpass('LMIS Password: ')
 
     print('LD_50 Scrape')
@@ -81,15 +84,14 @@ def scrape():
 
     UNIT_NUMBERS = input('Enter locomotive numbers separated by a space: ')
     UNIT_LIST = UNIT_NUMBERS.split(" ")
-
+    unitInfo = []
+    date = today.strftime("%m-%d")
     # login page for LMIS
     LOGIN_URL = "https://www2.nscorp.com/mech0000/login.lmis"
 
     payload = {
         "username": USERNAME, 
         "pass1": PASSWORD, 
-    #   LMIS does not require a token so this is not needed
-    #   "csrfmiddlewaretoken": authenticity_token
     }
 
     URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=0000009952&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="    
@@ -98,16 +100,14 @@ def scrape():
     session_requests = requests.session()
     result = session_requests.get(LOGIN_URL)
 
-    tree = html.fromstring(result.text)
-    
     # Login
     result = session_requests.post(LOGIN_URL, data = payload, headers = dict(referer = LOGIN_URL))
      
     # Loop over the input list and scrape the work orders
     for x in UNIT_LIST:
-    
         SCRAPE_URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="
         result = session_requests.get(SCRAPE_URL, headers = dict(referer = SCRAPE_URL))
+        
         #with open("/home/robbie/Code/Work/"+x+".html", 'wb') as file:
         #    file.write(result.content)
 
@@ -153,7 +153,112 @@ def scrape():
             print('Cab Signals Due: ' + csDue)
         if (soup.find("input", {"name":"hFc"})) is not None:
             fuelCap = soup.find("input", {"name":"hFc"})['value']
-            print('Fuel Capacity: ' + fuelCap)
+            print('Fuel Capacity: ' + fuelCap.lstrip("0"))
+        # Make a string that holds all this information per locomotive. 
+        # Make packets as a batch after all info has been pulled 
+        # (LMIS looks to drop out after stopping to ask about packets)
+        #locoInfo = x,',',date,',',fra,',',epa,',','Y',',',cabs
+
+        locoInfo = x,date,fra,epa,'Y',csDue
+        unitInfo.append(locoInfo)
+    correctInfo=input("\nIs the information correct? (y/n) ")
+    if correctInfo == 'y' or correctInfo == 'Y':
+        for info in unitInfo:
+            print('Saving cover for unit.')
+            URpacket = load_workbook(filename='URPacketCover.xlsx')
+            urpacket = URpacket.active        
+            urpacket.cell(row=2, column=1).value = info[0]
+            urpacket.cell(row=1, column=6).value = info[1]
+            urpacket.cell(row=5, column=3).value = info[2]
+            urpacket.cell(row=7, column=3).value = info[3]
+            urpacket.cell(row=4, column=6).value = info[4]
+            urpacket.cell(row=6, column=6).value = info[5]
+            urpacket.template = False
+            URpacket.save(info[0]+'.xlsx')
+    
+
+    menu()
+
+def scrape():
+    USERNAME = input('\nLMIS Username: ')
+    PASSWORD = getpass.getpass('LMIS Password: ')
+
+    print('LD_50 Scrape')
+    print('Author: Sean Robinson, SGL, Enola Diesel')
+    print('Welcome to the LMIS Scraper...\n')
+
+    UNIT_NUMBERS = input('Enter locomotive numbers separated by a space: ')
+    UNIT_LIST = UNIT_NUMBERS.split(" ")
+
+    # login page for LMIS
+    LOGIN_URL = "https://www2.nscorp.com/mech0000/login.lmis"
+
+    payload = {
+        "username": USERNAME, 
+        "pass1": PASSWORD, 
+    }
+
+    URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=0000009952&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="    
+    
+    # keeps us logged into the session
+    session_requests = requests.session()
+    result = session_requests.get(LOGIN_URL)
+
+    # Login
+    result = session_requests.post(LOGIN_URL, data = payload, headers = dict(referer = LOGIN_URL))
+     
+    # Loop over the input list and scrape the work orders
+    for x in UNIT_LIST:
+    
+        SCRAPE_URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="
+        result = session_requests.get(SCRAPE_URL, headers = dict(referer = SCRAPE_URL))
+        
+        #with open("/home/robbie/Code/Work/"+x+".html", 'wb') as file:
+        #    file.write(result.content)
+
+        soup = BeautifulSoup(result.content, 'lxml')
+
+        # add PTC health when able
+        # add DP also
+
+        print('FIXME: add ptc health to end of PTC line...add DP to report\n\n')
+        print('----',x,'----')
+        if (soup.find("input", {"name":"hModel"})) is not None:
+            model = soup.find("input", {"name":"hModel"})['value']
+            print('Model: ' + model)
+        if (soup.find("input", {"name":"hPtc"})) is not None:
+            ptc = soup.find("input", {"name":"hPtc"})['value']
+            print('PTC: ' + ptc)
+        if (soup.find("input", {"name":"hEM"})) is not None:
+            em = soup.find("input", {"name":"hEM"})['value']
+            print('EM: ' + em)
+        if (soup.find("input", {"name":"hCs"})) is not None:
+            cabs = soup.find("input", {"name":"hCs"})['value']
+            print('CS: ' + cabs)
+        if (soup.find("input", {"name":"hLSL"})) is not None:
+            lsl = soup.find("input", {"name":"hLSL"})['value']
+            print('LSL: ' + lsl)
+        if (soup.find("input", {"name":"hRelIu"})) is not None:
+            relInd = soup.find("input", {"name":"hRelIu"})['value']
+            print('Reliability: ' + relInd)
+        if (soup.find("input", {"name":"hEquivAxl"})) is not None:
+            group = soup.find("input", {"name":"hEquivAxl"})['value']
+            print('Power Group: ' + group)
+        if (soup.find("input", {"name":"hPropDue"})) is not None:
+            fra = soup.find("input", {"name":"hPropDue"})['value']
+            print('FRA Due: ' + fra)
+        if (soup.find("input", {"name":"hEpaDead"})) is not None:
+            epa = soup.find("input", {"name":"hEpaDead"})['value']
+            print('EPA Due: ' + epa)
+        if (soup.find("input", {"name":"hLubeDue"})) is not None:
+            lube = soup.find("input", {"name":"hLubeDue"})['value']
+            print('Lube Due: ' + lube)
+        if (soup.find("input", {"name":"hCabS"})) is not None:
+            csDue = soup.find("input", {"name":"hCabS"})['value']
+            print('Cab Signals Due: ' + csDue)
+        if (soup.find("input", {"name":"hFc"})) is not None:
+            fuelCap = soup.find("input", {"name":"hFc"})['value']
+            print('Fuel Capacity: ' + fuelCap.lstrip("0"))
  
     menu()
 
@@ -174,7 +279,7 @@ def writeMultColumns(row, column1, column2, robbed, paid):
 
     if emptyCol1 and emptyCol2 is None:
         emptyCol1 = t
-        emptyCOl2 = p
+        emptyCol2 = p
 
 def readSingleColumn(rowStart, rowEnd, col):
     x = rowStart
@@ -194,8 +299,11 @@ def readMultColumns(rowStart, rowEnd, colStart, colEnd):
         z = curSheet.cell(row=i, column=ce).value
         if x is None and z is not None:
             print(x,z)
+        elif x is int and x is not None:
+            print(x,'-->',z)
         elif x is not None:
-            print(x[:3],'-->',z)
+            print(str(x)[:3],'-->',z)
+            #print(x,'-->',z)
 
 def openEngines():
     print('\nSearching for Open Locomotives on Current Sheet.....')
@@ -222,10 +330,7 @@ def openEngines():
     openUnits = [s for s in inboundUnits if s not in usedUnits]
     print('Search complete...\n\nOpen Locomtovies:',openUnits,'\n')
     menu()
-            
-def createPackets():
-    print('FIXME: Use this function to create cover sheet based on MI/UR and LMIS scrape information')       
-    menu()
+
 
 def robPeter():
     print('\n|--------------- Robbing Peter ---------------|\n')
@@ -289,7 +394,7 @@ def payPaul():
             curSheet.cell(row=train, column=19).value = fromTrain
             print(checkTrain,':',checkUnits)
             break
-    print('Repaid check')
+    #print('Repaid check')
 
     dispatchReport()
 
@@ -309,7 +414,7 @@ def searchPower(newPower, fromRow):
             # assigning y to train symbols
             y = curSheet.cell(row=j, column=1).value
             if y is not None:
-                a = y[:3]
+                a = str(y)[:3]
                 z = curSheet.cell(row=j, column=3).value
                 if z is not None:
                     zlist = z.strip()

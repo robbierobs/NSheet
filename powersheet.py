@@ -1,25 +1,27 @@
+# use python-tabulate to create tables for the powersheet.
+# use train symbols as a list with attached engines inside the list
+# Grab txt files for unit characteristics to make printing easier
 from datetime import date
 from openpyxl import load_workbook
+from openpyxl import Workbook
 import requests
 from lxml import html
 from bs4 import BeautifulSoup
 import getpass
 import os
 import sys
-
-#os.chdir('/home/robbie/Code/Work/excel/')
-#wb = load_workbook(filename = 'Powersheet_Template2.xlsx')
+#import re
 
 today = date.today()
 curDate = today.strftime("%m-%d-%Y")
-
-#curDate = '12-02-2019'
-
 fromList = ' '
-wb = load_workbook(filename = 'Enola_Powersheet_'+curDate+'.xlsx')
-curSheet = wb[curDate]
+#wb = load_workbook(filename = 'Enola_Powersheet_'+curDate+'.xlsx')
+wb = load_workbook(filename = 'Enola Powersheet 12-14-2019 1430.xlsx')
+#current_sheet = wb[curDate]
+current_sheet = wb['12-14-2019']
 
-print('Currently working with the',curDate,'worksheet...')
+#print('Currently working with the',curDate,'worksheet...')
+print('Using a static sheet currently')
 print('At the moment this is only being built for C-trick\n\n')
 print('Add a turnover function to automatically fill that out')
 
@@ -62,7 +64,7 @@ def menu():
     elif choice == 'H' or choice == 'h':
         shoppers()
     elif choice == 'I' or choice == 'i':
-        createPackets()
+        create_packets()
     elif choice == 'J' or choice == 'j':
         scrape()
     elif choice == "Q" or choice == "q":
@@ -74,7 +76,7 @@ def menu():
 
 
 
-def createPackets():
+def create_packets():
     USERNAME = input('\nLMIS Username: ')
     PASSWORD = getpass.getpass('LMIS Password: ')
 
@@ -82,8 +84,8 @@ def createPackets():
     print('Author: Sean Robinson, SGL, Enola Diesel')
     print('Welcome to the LMIS Scraper...\n')
 
-    UNIT_NUMBERS = input('Enter locomotive numbers separated by a space: ')
-    UNIT_LIST = UNIT_NUMBERS.split(" ")
+    locomotive_numbers = input('Enter locomotive numbers separated by a space: ')
+    locomotive_list = locomotive_numbers.split(" ")
     unitInfo = []
     date = today.strftime("%m-%d")
     # login page for LMIS
@@ -94,8 +96,6 @@ def createPackets():
         "pass1": PASSWORD, 
     }
 
-    URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=0000009952&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="    
-    
     # keeps us logged into the session
     session_requests = requests.session()
     result = session_requests.get(LOGIN_URL)
@@ -104,14 +104,21 @@ def createPackets():
     result = session_requests.post(LOGIN_URL, data = payload, headers = dict(referer = LOGIN_URL))
      
     # Loop over the input list and scrape the work orders
-    for x in UNIT_LIST:
-        SCRAPE_URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="
-        result = session_requests.get(SCRAPE_URL, headers = dict(referer = SCRAPE_URL))
+    for x in locomotive_list:
+        #locomotive_characteristics = ('https://www2.nscorp.com/mech0000/Locomotive?frame=frm&init=NS&nbr=9355&callingScreen=SHOPGRID')
+        unit_information_report = ("https://www2.nscorp.com/mech0000/displayReports.lmis?nme=http://mechanical.nscorp.com/loc_Info/reports/Unit_Info_Reports/NS000000"+x+".txt")
+        #scheduled_maintenance_dates = ('https://www2.nscorp.com/mech0000/SmDueDates.lmis?action=S&callingScreen=OUTWRKOR&unitinit=NS&unitnumber=0000009355&inclsmi=N')
+        #unit_in_shop_by_reason = ('https://www2.nscorp.com/mech0000/unitshopreason.lmis')
+        #shop_it_units = ('https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=')
+        LMIS_URL = ("https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule=")
+        result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
         
-        #with open("/home/robbie/Code/Work/"+x+".html", 'wb') as file:
-        #    file.write(result.content)
-
+        unit_result = session_requests.get(unit_information_report, headers = dict(referer = unit_information_report))
         soup = BeautifulSoup(result.content, 'lxml')
+
+
+
+        #unit_soup = BeautifulSoup(unit_result.content, 'lxml')
 
         # add PTC health when able
         # add DP also
@@ -151,32 +158,58 @@ def createPackets():
         if (soup.find("input", {"name":"hCabS"})) is not None:
             csDue = soup.find("input", {"name":"hCabS"})['value']
             print('Cab Signals Due: ' + csDue)
+        else:
+            csDue = '-'
         if (soup.find("input", {"name":"hFc"})) is not None:
             fuelCap = soup.find("input", {"name":"hFc"})['value']
             print('Fuel Capacity: ' + fuelCap.lstrip("0"))
-        # Make a string that holds all this information per locomotive. 
-        # Make packets as a batch after all info has been pulled 
-        # (LMIS looks to drop out after stopping to ask about packets)
-        #locoInfo = x,',',date,',',fra,',',epa,',','Y',',',cabs
+        if (soup.find("input", {"name:":"hNextFraAirFlowMeter"})) is not None:
+            airFlow = soup.find("input", {"name:":"hNextFraAirFlowMeter"})['value'] 
+        else:
+            airFlow = '-'
+        
+        locomotive_Info = x,date,fra,epa,'Y',csDue
+        unitInfo.append(locomotive_Info)
 
-        locoInfo = x,date,fra,epa,'Y',csDue
-        unitInfo.append(locoInfo)
+
     correctInfo=input("\nIs the information correct? (y/n) ")
     if correctInfo == 'y' or correctInfo == 'Y':
+        miCover = load_workbook(filename="MIPacketCover.xlsx")
+        urCover = load_workbook(filename="URPacketCover.xlsx")
         for info in unitInfo:
-            print('Saving cover for unit.')
-            URpacket = load_workbook(filename='URPacketCover.xlsx')
-            urpacket = URpacket.active        
-            urpacket.cell(row=2, column=1).value = info[0]
-            urpacket.cell(row=1, column=6).value = info[1]
-            urpacket.cell(row=5, column=3).value = info[2]
-            urpacket.cell(row=7, column=3).value = info[3]
-            urpacket.cell(row=4, column=6).value = info[4]
-            urpacket.cell(row=6, column=6).value = info[5]
-            urpacket.template = False
-            URpacket.save(info[0]+'.xlsx')
-    
-
+            maint = input('Is '+info[0]+' a maintenance unit? (y/n) ')
+            if maint == "y" or maint == "Y":
+                print('Saving cover for Unit #: '+info[0]+'.')
+                packet = miCover.copy_worksheet(miCover["MI Cover Sheet"])
+                packet.title=info[0]
+                packet.cell(row=2, column=1).value = info[0]
+                packet.cell(row=1, column=6).value = info[1]
+                packet.cell(row=5, column=3).value = info[2]
+                packet.cell(row=7, column=3).value = info[3]
+                packet.cell(row=3, column=6).value = 'Y'
+                packet.cell(row=4, column=6).value = 'Y'
+                packet.cell(row=5, column=6).value = 'Y'
+                packet.cell(row=6, column=6).value = info[5]
+                packet.cell(row=7, column=6).value = airFlow
+                #print(packet.cell(row=2, column=1).value)
+            elif maint == 'n' or maint == 'N':
+                print('Saving cover for Unit #: '+info[0]+'.')
+                packet = urCover.copy_worksheet(urCover["UR Cover Sheet"])
+                packet.title=info[0]
+                packet.cell(row=2, column=1).value = info[0]
+                packet.cell(row=1, column=6).value = info[1]
+                packet.cell(row=5, column=3).value = info[2]
+                packet.cell(row=7, column=3).value = info[3]
+                packet.cell(row=4, column=6).value = info[4]
+                packet.cell(row=6, column=6).value = info[5]
+                #print(packet.cell(row=2, column=1).value)              
+            
+        #del urCover['UR Cover Sheet']
+        urCover.save('UR_Units_CoverSheets_'+curDate+'.xlsx')              
+        #del miCover['MI Cover Sheet']
+        miCover.save('MI_Unit_CoverSheets_'+curDate+'.xlsx')
+        #mr = soup(text=re.compile('MR')))
+      
     menu()
 
 def scrape():
@@ -198,7 +231,7 @@ def scrape():
         "pass1": PASSWORD, 
     }
 
-    URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=0000009952&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="    
+    #URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=0000009952&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="    
     
     # keeps us logged into the session
     session_requests = requests.session()
@@ -210,8 +243,8 @@ def scrape():
     # Loop over the input list and scrape the work orders
     for x in UNIT_LIST:
     
-        SCRAPE_URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="
-        result = session_requests.get(SCRAPE_URL, headers = dict(referer = SCRAPE_URL))
+        LMIS_URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="
+        result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
         
         #with open("/home/robbie/Code/Work/"+x+".html", 'wb') as file:
         #    file.write(result.content)
@@ -274,20 +307,25 @@ def writeMultColumns(row, column1, column2, robbed, paid):
     print('|---------- Writing Data ----------|')
 
     #check for empty cells
-    emptyCol1 = curSheet.cell(row=r, column=col1).value
-    emptyCol2 = curSheet.cell(row=r, column=col2).value 
+    emptyCol1 = current_sheet.cell(row=r, column=col1).value
+    emptyCol2 = current_sheet.cell(row=r, column=col2).value 
 
     if emptyCol1 and emptyCol2 is None:
         emptyCol1 = t
         emptyCol2 = p
 
 def readSingleColumn(rowStart, rowEnd, col):
-    x = rowStart
-    y = rowEnd
-    c = col
-    for i in range(x, y):
-        z = curSheet.cell(row=i, column=c).value
-        print(z)
+    row_start = rowStart
+    row_end= rowEnd
+    column = col
+    this_list= []
+    for row in range(row_start, row_end):
+        cell_value = current_sheet.cell(row=row, column=column).value
+        if cell_value is not None:
+            this_list.append(cell_value)
+        elif cell_value is None:
+            this_list.append('-')
+    return this_list
 
 def readMultColumns(rowStart, rowEnd, colStart, colEnd):
     rs = rowStart
@@ -295,8 +333,8 @@ def readMultColumns(rowStart, rowEnd, colStart, colEnd):
     cs = colStart
     ce = colEnd
     for i in range(rs, re):
-        x = curSheet.cell(row=i, column=cs).value
-        z = curSheet.cell(row=i, column=ce).value
+        x = current_sheet.cell(row=i, column=cs).value
+        z = current_sheet.cell(row=i, column=ce).value
         if x is None and z is not None:
             print(x,z)
         elif x is int and x is not None:
@@ -305,12 +343,49 @@ def readMultColumns(rowStart, rowEnd, colStart, colEnd):
             print(str(x)[:3],'-->',z)
             #print(x,'-->',z)
 
+def readMultColumnsTable(rowStart, rowEnd, colOne, colTwo):
+    row_start = rowStart
+    row_end = rowEnd
+    column_one = colOne
+    column_two = colTwo
+    list_one = []
+    list_two = []
+
+    for cell in range(row_start, row_end):
+        column1 = current_sheet.cell(row=cell, column=column_one).value
+        column2 = current_sheet.cell(row=cell, column=column_two).value
+        if column1 is None and column2 is not None:
+            list_one.append('-')
+            list_two.append(column2)
+        elif column1 is int and column2 is not None:
+            list_one.append(column1)
+            list_two.append(column2)
+        elif column1 is not None and column2 is None:
+            list_one.append(str(column1)[:3]+' ---------->')
+            list_two.append('-')
+        elif column1 is not None:
+            list_one.append(str(column1)[:3]+' ---------->')
+            list_two.append(column2)
+    return list_one, list_two
+
+def table_format(list_one, list_two, label_one, label_two):
+    fmt = '{:<8}{:<20}{}'
+    print(fmt.format('', label_one, label_two))
+    for stuff, (row,column) in enumerate(zip(list_one, list_two)):
+        print(fmt.format((stuff + 1), row, column))
+        
+def table_format_three(list_one, list_two, list_three, label_one, label_two, label_three):
+    fmt = '{:<8}{:<20}{:<50}{}'
+    print(fmt.format('', label_one, label_two, label_three))
+    for stuff, (list_a, list_b, list_c) in enumerate(zip(list_one, list_two, list_three)):
+        print(fmt.format((stuff + 1), list_a, list_b, list_c))
+
 def openEngines():
     print('\nSearching for Open Locomotives on Current Sheet.....')
     
     inboundUnits=[]
     for rows in range (4, 27):
-        row = curSheet.cell(row=rows, column = 3).value
+        row = current_sheet.cell(row=rows, column = 3).value
         if row is not None:
             rowSlicer = row.split()
             slash = '/'
@@ -319,7 +394,7 @@ def openEngines():
             inboundUnits.extend(newList)
     usedUnits=[]
     for rows in range(4, 27):
-        row = curSheet.cell(row=rows, column=14).value
+        row = current_sheet.cell(row=rows, column=14).value
         if row is not None:
             rowSlicer = row.split()
             slash = '/'
@@ -331,7 +406,6 @@ def openEngines():
     print('Search complete...\n\nOpen Locomtovies:',openUnits,'\n')
     menu()
 
-
 def robPeter():
     print('\n|--------------- Robbing Peter ---------------|\n')
     
@@ -339,25 +413,25 @@ def robPeter():
     stolenUnits = input('What units are being stolen?  ')
 
     stolenList = stolenUnits.split()
-    #print(stolenList)
+    print(stolenList)
     
     payTrain = input('What train are we paying '+stolenTrain+' to? (ex. 15T - OUTBOUND)  ')
 
     #check inbound side for an empty slot to fill in the robbed train
     #then insert the information 
     for train in range(15, 28):
-        checkTrain = curSheet.cell(row=train, column=1).value
-        checkUnits = curSheet.cell(row=train, column=3).value
+        checkTrain = current_sheet.cell(row=train, column=1).value
+        checkUnits = current_sheet.cell(row=train, column=3).value
         if checkTrain is None and checkUnits is None:
             if stolenTrain.find('.') >= 0:
                 datedTrain = stolenTrain.split('.')
-                curSheet.cell(row=train,column=1).value=datedTrain[0]
-                curSheet.cell(row=train, column=2).value=datedTrain[1]
-                curSheet.cell(row=train, column=3).value = stolenUnits
+                current_sheet.cell(row=train,column=1).value=datedTrain[0]
+                current_sheet.cell(row=train, column=2).value=datedTrain[1]
+                current_sheet.cell(row=train, column=3).value = stolenUnits
             else:
-                curSheet.cell(row=train, column=1).value = stolenTrain
-                curSheet.cell(row=train, column=3).value = stolenUnits
-            curSheet.cell(row=train, column=8).value = payTrain
+                current_sheet.cell(row=train, column=1).value = stolenTrain
+                current_sheet.cell(row=train, column=3).value = stolenUnits
+            current_sheet.cell(row=train, column=8).value = payTrain
             print(checkTrain,':',checkUnits)
             break
 
@@ -366,11 +440,11 @@ def robPeter():
     
     #check for empty rows in the outbound extras 
     for train in range(15, 28):
-        checkTrain = curSheet.cell(row=train, column=12).value
-        checkUnits = curSheet.cell(row=train, column=14).value
+        checkTrain = current_sheet.cell(row=train, column=12).value
+        checkUnits = current_sheet.cell(row=train, column=14).value
         if checkTrain is None and checkUnits is None:
-            curSheet.cell(row=train, column=12).value = stolenTrain
-            curSheet.cell(row=train, column=14).value = needed
+            current_sheet.cell(row=train, column=12).value = stolenTrain
+            current_sheet.cell(row=train, column=14).value = needed
             print(checkTrain,':',checkUnits)
             break
     dispatchReport()
@@ -387,11 +461,11 @@ def payPaul():
     fromTrain = input('What train are we paying '+payTrain+' from? ')
 
     for train in range(16, 28):
-        checkTrain = curSheet.cell(row=train, column=12).value
-        checkUnits = curSheet.cell(row=train, column=14).value
+        checkTrain = current_sheet.cell(row=train, column=12).value
+        checkUnits = current_sheet.cell(row=train, column=14).value
         if checkTrain == payTrain:
-            curSheet.cell(row=train, column=14).value = payUnits
-            curSheet.cell(row=train, column=19).value = fromTrain
+            current_sheet.cell(row=train, column=14).value = payUnits
+            current_sheet.cell(row=train, column=19).value = fromTrain
             print(checkTrain,':',checkUnits)
             break
     #print('Repaid check')
@@ -412,10 +486,10 @@ def searchPower(newPower, fromRow):
         x = i[:4]
         for j in range (4, 27):
             # assigning y to train symbols
-            y = curSheet.cell(row=j, column=1).value
+            y = current_sheet.cell(row=j, column=1).value
             if y is not None:
                 a = str(y)[:3]
-                z = curSheet.cell(row=j, column=3).value
+                z = current_sheet.cell(row=j, column=3).value
                 if z is not None:
                     zlist = z.strip()
                     search = zlist.find(x)
@@ -424,7 +498,7 @@ def searchPower(newPower, fromRow):
     remove_adjacent(units)
     fromList = (' / '.join(units))
     print('From: ',fromList)
-    curSheet.cell(row=row, column=21).value = fromList
+    current_sheet.cell(row=row, column=21).value = fromList
 
 def remove_adjacent(seq): # works on any sequence, not just on numbers
     i = 1
@@ -440,48 +514,38 @@ def remove_adjacent(seq): # works on any sequence, not just on numbers
 def appendBuild():
     print('\n|*************** Changing Power ***************|\n')
 
-    print('\n----------Inbound trains----------')
-    for i in range(4, 16):
-        x = curSheet.cell(row=i, column=1).value
-        #sets y = to the first 3 letters of the string
-        y = x[:3]
-        z = curSheet.cell(row=i, column=3).value
-        print(y,': ',z)
-    print('------------------------------------\n')
-    
-    j = 1
-    for i in range(4, 16):
-        x = curSheet.cell(row=i, column=12).value
-        y = x[:3]
-        print(j,':',y,'-',curSheet.cell(row=i, column=14).value)
-        j += 1
+    print('\n----------| Inbound Trains |------------\n')
+    inbound_train,inbound_power = readMultColumnsTable(4, 16, 1, 3)
+    table_format(inbound_train, inbound_power, 'Train Symbol', 'Power')
+
+    print('\n----------| Outbound Trains |------------\n')
+    outbound_train, outbound_power = readMultColumnsTable(4, 16, 12, 14)
+    table_format(outbound_train, outbound_power, 'Train Symbol', 'Power')
 
     selectPower = input('\n\nWhat train would you like to change?  ')
     # row will be the current row, we have to add 3 to get down to the correct cell
  
     row = int(selectPower) + int(3)
-    cValue = curSheet.cell(row=int(row), column=14).value
+    old_build = current_sheet.cell(row=int(row), column=14).value
     
-    print('\n|---------- Appending build for',curSheet.cell(row=row, column=12).value,'----------|\n')
-    print('Current build: ', cValue)
+    print('\n|---------- Appending build for',current_sheet.cell(row=row, column=12).value,'----------|\n')
+    print('Current build: ', old_build)
     
     newBuild = input('New build:  ')
     confirmBuild = input('You would like to change the build to: ' + newBuild + ' ? (y/n)  ')
 
     if confirmBuild == 'y' or confirmBuild =="Y":
-        print('\nChanging power from ', cValue, ' to :', newBuild,' .')
-        curSheet.cell(row=row, column=14).value = newBuild
-        print('Power changed to', curSheet.cell(row=row, column=14).value, ' .\n')
+        print('\nChanging power from ', old_build, ' to :', newBuild,' .')
+        current_sheet.cell(row=row, column=14).value = newBuild
+        print('Power changed to', current_sheet.cell(row=row, column=14).value, ' .\n')
+        
         #Editing the "From" category on Outbound Trains
-        newBuildValue = curSheet.cell(row=row, column=14).value
+        newBuildValue = current_sheet.cell(row=row, column=14).value
         print('Consist:',newBuildValue)
         
         #Searches the inbound columns to find where power came from
         searchPower(newBuildValue, row)
-     
-        #newFrom = input('---From: ')
-        #curSheet.cell(row=row, column=21).value = newFrom
-        print(curSheet.cell(row=row, column=12).value,' changed to: ',newBuild, ' FROM:', curSheet.cell(row=row, column=21).value, '.\n')
+        print(current_sheet.cell(row=row, column=12).value,' changed to: ',newBuild, ' FROM:', current_sheet.cell(row=row, column=21).value, '.\n')
         
     else:
         print('No changes made.\n')
@@ -489,26 +553,36 @@ def appendBuild():
 
 def dispatchReport():
     print('\n---------- Inbound Trains ----------\n')
-    readMultColumns(4, 15, 1, 3)    
+    inbound_train,inbound_power = (readMultColumnsTable(4, 15, 1, 3))
+    table_format(inbound_train, inbound_power, 'Train Symbol','Power')
     print('\n---------- Outbound Trains ----------\n')
-    readMultColumns(4, 16, 12, 14)
+    outbound_trains, outbound_power = (readMultColumnsTable(4, 16, 12, 14))
+    table_format(outbound_trains, outbound_power, 'Train Symbol','Power')
     print('\n---------- Extra Inbounds ----------\n')
-    readMultColumns(15, 28, 1, 3)
+    extra_inbounds, extra_inbound_power = (readMultColumnsTable(15, 28, 1, 3))
+    table_format(extra_inbounds, extra_inbound_power, 'Train Symbol','Power')
     print('\n---------- Extra Outbounds ----------\n')
-    readMultColumns(16, 28, 12, 14)
+    extra_outbound, extra_outbound_power = (readMultColumnsTable(16, 28, 12, 14))
+    table_format(extra_outbound, extra_outbound_power, 'Train Symbol','Power')
     print('\n')
     menu()
-
+    
 def fromBuilt():
+
+    outbound_trains, outbound_power = (readMultColumnsTable(4, 18, 12, 14))
+    from_symbol = readSingleColumn(4, 18, 21)
+    #table_format(outbound_trains, outbound_power, 'Train Symbol', 'Power')
+    table_format_three(outbound_trains, outbound_power, from_symbol, 'Train Symbol', 'Power', 'From')
     print('\n')
-    for i in range(4, 15):
-        x = curSheet.cell(row=i, column=12).value
-        y = x[:3]
-        z = curSheet.cell(row=i, column=14).value
-        a = curSheet.cell(row=i, column=21).value
-        print(y,': ',z, '-->',a)
-        #print('----: ',a,'\n')
-    print('\n')
+    #for i in range(4, 15):
+    #    x = current_sheet.cell(row=i, column=12).value
+    #    y = x[:3]
+    #    z = current_sheet.cell(row=i, column=14).value
+    #    a = current_sheet.cell(row=i, column=21).value
+    #    print(y,': ',z)
+    #    print('From:',a,'\n')
+    #    #print('----: ',a,'\n')
+    #print('\n')
     menu()
 
 def savePowersheet():

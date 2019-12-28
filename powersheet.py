@@ -1,7 +1,9 @@
 # use python-tabulate to create tables for the powersheet.
 # use train symbols as a list with attached engines inside the list
 # Grab txt files for unit characteristics to make printing easier
+from datetime import datetime
 from datetime import date
+from datetime import timedelta
 from openpyxl import load_workbook
 from openpyxl import Workbook
 import requests
@@ -86,8 +88,12 @@ def create_packets():
 
     locomotive_numbers = input('Enter locomotive numbers separated by a space: ')
     locomotive_list = locomotive_numbers.split(" ")
+    date = today.strftime("%m-%d-%Y")
     unitInfo = []
-    date = today.strftime("%m-%d")
+    scheduled = []
+    scheduled_date = []
+    scheduled_tasks = []
+    scheduled_task_dates = []
     # login page for LMIS
     LOGIN_URL = "https://www2.nscorp.com/mech0000/login.lmis"
 
@@ -106,22 +112,59 @@ def create_packets():
     # Loop over the input list and scrape the work orders
     for x in locomotive_list:
         #locomotive_characteristics = ('https://www2.nscorp.com/mech0000/Locomotive?frame=frm&init=NS&nbr=9355&callingScreen=SHOPGRID')
-        unit_information_report = ("https://www2.nscorp.com/mech0000/displayReports.lmis?nme=http://mechanical.nscorp.com/loc_Info/reports/Unit_Info_Reports/NS000000"+x+".txt")
+        #unit_information_report = ("https://www2.nscorp.com/mech0000/displayReports.lmis?nme=http://mechanical.nscorp.com/loc_Info/reports/Unit_Info_Reports/NS000000"+x+".txt")
         #scheduled_maintenance_dates = ('https://www2.nscorp.com/mech0000/SmDueDates.lmis?action=S&callingScreen=OUTWRKOR&unitinit=NS&unitnumber=0000009355&inclsmi=N')
         #unit_in_shop_by_reason = ('https://www2.nscorp.com/mech0000/unitshopreason.lmis')
         #shop_it_units = ('https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=')
         LMIS_URL = ("https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule=")
-        result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
+        scheduled_dates_url ="https://www2.nscorp.com/mech0000/SmDueDates.lmis?action=S&callingScreen=OUTWRKOR&unitinit=NS&unitnumber=000000"+x+"&inclsmi=N"
         
-        unit_result = session_requests.get(unit_information_report, headers = dict(referer = unit_information_report))
+        result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
+        scheduled_result = session_requests.get(scheduled_dates_url, headers = dict(referer = scheduled_dates_url))
+
+        #unit_result = session_requests.get(unit_information_report, headers = dict(referer = unit_information_report))
         soup = BeautifulSoup(result.content, 'lxml')
-
-
+        scheduled_soup = BeautifulSoup(scheduled_result.content, 'lxml')
+        
+        
 
         #unit_soup = BeautifulSoup(unit_result.content, 'lxml')
 
         # add PTC health when able
         # add DP also
+        
+        # scheduled due dates 
+        # items are hidden on the due dates page
+        # they are not static and will have to be searched through
+        #print('test fire!--------->', scheduled_soup.find("input", {"name":"hTaskType0"})['value'])
+        # scanning due dates
+
+        #this print the category and due date, make this into a list or table?
+        for task in range(0, 19):
+            due_task = scheduled_soup.find("input", {"name":"hTaskType"+str(task)})['value']
+            due_date_str = scheduled_soup.find("input", {"name":"hNextDueDate"+str(task)})['value']
+            due_date = datetime.strptime(due_date_str, '%m-%d-%Y')
+            mi_date = (datetime.today() + timedelta(6))
+            if due_date < mi_date:
+                scheduled_tasks.append(due_task)
+                scheduled_task_dates.append(due_date_str)
+            #compare dates and add due dates to a list
+            #check list for comparison to see if something exists (lube, labs, af, etc)
+            #if it exists, make a variable so it can be added to the work packet
+            #scheduled_task_item = due_task,due_date_str     
+            #scheduled_tasks.append(scheduled_task_item)
+        table_format(scheduled_tasks, scheduled_task_dates, 'Tasks Due', 'Due Date')
+
+        #scheduled.append(list(zip(scheduled_tasks,scheduled_task_dates)))
+        scheduled.append(list(scheduled_tasks))
+        scheduled_date.append(list(scheduled_task_dates))
+        scheduled_tasks.clear()
+        scheduled_task_dates.clear()
+        #print(scheduled)
+        #print(scheduled_date)
+        #print(str(scheduled))
+        # TS,LS,LB,1Y,2Y,N6,M5,M6,AF,EV,MR,CS,HB,AN,AB,RS, N2,N4,N5,M7,M2,M3,M5,RS(tape)
+        #maintenance_dates(scheduled_tasks, scheduled_task_dates)
 
         print('FIXME: add ptc health to end of PTC line...add DP to report\n\n')
         print('----',x,'----')
@@ -172,26 +215,36 @@ def create_packets():
         unitInfo.append(locomotive_Info)
 
 
+
     correctInfo=input("\nIs the information correct? (y/n) ")
     if correctInfo == 'y' or correctInfo == 'Y':
+        mi_starting_cell = 24
+        ur_starting_cell = 23
         miCover = load_workbook(filename="MIPacketCover.xlsx")
         urCover = load_workbook(filename="URPacketCover.xlsx")
+        j = 0
         for info in unitInfo:
             maint = input('Is '+info[0]+' a maintenance unit? (y/n) ')
             if maint == "y" or maint == "Y":
                 print('Saving cover for Unit #: '+info[0]+'.')
                 packet = miCover.copy_worksheet(miCover["MI Cover Sheet"])
                 packet.title=info[0]
+                # trying to the new function
+                # maintenance_dates(scheduled_tasks, scheduled_task_dates, packet)
+                maintenance_dates(scheduled[int(j)], scheduled_date[int(j)],
+                                 packet)
+                worksheet_tasks(packet, mi_starting_cell)
                 packet.cell(row=2, column=1).value = info[0]
                 packet.cell(row=1, column=6).value = info[1]
                 packet.cell(row=5, column=3).value = info[2]
-                packet.cell(row=7, column=3).value = info[3]
-                packet.cell(row=3, column=6).value = 'Y'
+                #packet.cell(row=7, column=3).value = info[3]
+                #packet.cell(row=3, column=6).value = 'Y'
                 packet.cell(row=4, column=6).value = 'Y'
-                packet.cell(row=5, column=6).value = 'Y'
-                packet.cell(row=6, column=6).value = info[5]
-                packet.cell(row=7, column=6).value = airFlow
+                #packet.cell(row=5, column=6).value = 'Y'
+                #packet.cell(row=6, column=6).value = info[5]
+                #packet.cell(row=7, column=6).value = airFlow
                 #print(packet.cell(row=2, column=1).value)
+                j += 1
             elif maint == 'n' or maint == 'N':
                 print('Saving cover for Unit #: '+info[0]+'.')
                 packet = urCover.copy_worksheet(urCover["UR Cover Sheet"])
@@ -199,15 +252,19 @@ def create_packets():
                 packet.cell(row=2, column=1).value = info[0]
                 packet.cell(row=1, column=6).value = info[1]
                 packet.cell(row=5, column=3).value = info[2]
-                packet.cell(row=7, column=3).value = info[3]
-                packet.cell(row=4, column=6).value = info[4]
-                packet.cell(row=6, column=6).value = info[5]
-                #print(packet.cell(row=2, column=1).value)              
-            
+                maintenance_dates(scheduled[int(j)], scheduled_date[int(j)],
+                                  packet)
+                #maintenance_dates(scheduled_tasks, scheduled_task_dates, packet)
+                worksheet_tasks(packet, ur_starting_cell)
+                packet.cell(row=4, column=6).value = 'Y'
+                j += 1
+                #print(packet.cell(row=2, column=1).value)               
         #del urCover['UR Cover Sheet']
-        urCover.save('UR_Units_CoverSheets_'+curDate+'.xlsx')              
+        #urCover.save('UR_Units_CoverSheets_'+curDate+'.xlsx')
+        urCover.save('UR_CoverSheets.xlsx')
         #del miCover['MI Cover Sheet']
-        miCover.save('MI_Unit_CoverSheets_'+curDate+'.xlsx')
+        miCover.save('MI_CoverSheets.xlsx')
+        # miCover.save('MI_Unit_CoverSheets_'+curDate+'.xlsx')
         #mr = soup(text=re.compile('MR')))
       
     menu()
@@ -245,7 +302,6 @@ def scrape():
     
         LMIS_URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="
         result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
-        
         #with open("/home/robbie/Code/Work/"+x+".html", 'wb') as file:
         #    file.write(result.content)
 
@@ -292,11 +348,99 @@ def scrape():
         if (soup.find("input", {"name":"hFc"})) is not None:
             fuelCap = soup.find("input", {"name":"hFc"})['value']
             print('Fuel Capacity: ' + fuelCap.lstrip("0"))
- 
+
     menu()
 
+def worksheet_tasks(packet, cell):
+    #ur=32 38 33 39
+    work_list = []
+    work_header = []
+    while True:
+        header = input('Input worksheet header: ')
+        if header == 'Q' or header =='q' or header == '':
+            break
+        work_header.append(header)
+        print(work_header)
+        work_task = input('Input worksheet task: ')
+        if work_task == 'Q' or work_task == 'q' or work_task == '':
+            break
+        work_list.append(work_task)
+        print(work_list)
+
+    for head in work_header:
+        work_cell_iterator = int(cell)
+        while packet.cell(row=work_cell_iterator, column=2).value is not None:
+            if work_cell_iterator == 32:
+                work_cell_iterator = int(work_cell_iterator) + 6
+            elif work_cell_iterator == 33:
+                work_cell_iterator = int(work_cell_iterator) + 5
+            else:
+                work_cell_iterator = int(work_cell_iterator) + 3
+        print('Adding header: '+head)
+        packet.cell(row=work_cell_iterator, column=2).value = head
+
+    for task in work_list:
+        work_cell_iterator = int(cell) + 1
+        while packet.cell(row=work_cell_iterator, column=2).value is not None:
+            #print(work_cell_iterator)
+            if work_cell_iterator == 33:
+                work_cell_iterator = int(work_cell_iterator) + 6
+            elif work_cell_iterator == 34:
+                work_cell_iterator = int(work_cell_iterator) + 5
+            else:
+                work_cell_iterator = int(work_cell_iterator) + 3
+        print('Adding task: '+task)
+        packet.cell(row=work_cell_iterator, column=2).value = task
+def maintenance_dates(tasks, due_dates, packet):
+    mi_due_cell = packet.cell(row=6, column=3).value
+    epa_due_cell = packet.cell(row=7, column=3).value
+    epa_due = ''
+    mi_due = ''
+    if 'LS' in tasks:
+        #print('Samples due.')
+        task_index = tasks.index('LS')
+        packet.cell(row=3, column=6).value = 'Y'
+    if 'AF' in tasks:
+        #print('Airflow due.')
+        task_index = tasks.index('AF')
+        #air_flow = due_dates[task_index]
+        packet.cell(row=7, column=6).value = 'Y'
+    if 'CS' in tasks:
+        #print('Cabs due.')
+        packet.cell(row=6, column=6).value = 'Y'
+    if 'LB' in tasks:
+        #print('Lube due.')
+        packet.cell(row=5, column=6).value = 'Y'
+    if '1Y' in tasks and '2Y' in tasks:
+        #print('EPA: 1Y, 2Y')
+        packet.cell(row=7, column=3).value = epa_dua+'1Y, 2Y'
+    elif '1Y' in tasks:
+        #print('1Y EPA')
+        packet.cell(row=7, column=3).value = epa_due+'1Y'
+    elif '2Y' in tasks:
+        #print('EPA: 2Y')
+        packet.cell(row=7, column=3).value = epa_due+'2Y'
+    if 'M5' in tasks:
+        #print('EPA: M5')
+        packet.cell(row=7, column=3).value = epa_due+'M5'
+    if 'M6' in tasks:
+        packet.cell(row=7, column=3).value = epa_due+'M6'
+        #print('EPA: M6')
+    if 'M7' in tasks:
+        packet.cell(row=7, column=3).value = epa_due+'M7'
+        #print('EPA: M7')
+    if 'N6' in tasks:
+        packet.cell(row=7, column=3).value = epa_due+',N6'
+    if 'MR' in tasks:
+        packet.cell(row=6, column=3).value = '6mo'
+    if 'AN' in tasks:
+        #print('12mo.')
+        packet.cell(row=6, column=3).value = '12mo'
+    if 'AB' in tasks:
+        #print('Air change.')
+        packet.cell(row=6, column=3).value = packet.cell(row=6,
+                                                         column=3).value+', Air'
 def writeMultColumns(row, column1, column2, robbed, paid):
-    
     r = row
     col1 = column1
     col2 = column2

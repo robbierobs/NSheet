@@ -1,5 +1,3 @@
-# use python-tabulate to create tables for the powersheet.
-# use train symbols as a list with attached engines inside the list
 # Grab txt files for unit characteristics to make printing easier
 from datetime import datetime
 from datetime import date
@@ -42,7 +40,8 @@ def menu():
                 G: Search for open engines
                 H: Identify shoppers
                 I: Make Work Packets
-                J: Scrape Unit Information
+                J: Scrape Unit Information (needs updated)
+                K: Locomotive Notes
 
 
                 Q: Quit/Log Out
@@ -69,6 +68,8 @@ def menu():
         create_packets()
     elif choice == 'J' or choice == 'j':
         scrape()
+    elif choice == 'K' or choice == 'k':
+        notes()
     elif choice == "Q" or choice == "q":
         sys.exit
     else:
@@ -118,26 +119,20 @@ def create_packets():
         #shop_it_units = ('https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=')
         LMIS_URL = ("https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule=")
         scheduled_dates_url ="https://www2.nscorp.com/mech0000/SmDueDates.lmis?action=S&callingScreen=OUTWRKOR&unitinit=NS&unitnumber=000000"+x+"&inclsmi=N"
-        
         result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
         scheduled_result = session_requests.get(scheduled_dates_url, headers = dict(referer = scheduled_dates_url))
 
         #unit_result = session_requests.get(unit_information_report, headers = dict(referer = unit_information_report))
         soup = BeautifulSoup(result.content, 'lxml')
         scheduled_soup = BeautifulSoup(scheduled_result.content, 'lxml')
-        
-        
 
         #unit_soup = BeautifulSoup(unit_result.content, 'lxml')
 
         # add PTC health when able
         # add DP also
-        
         # scheduled due dates 
         # items are hidden on the due dates page
         # they are not static and will have to be searched through
-        #print('test fire!--------->', scheduled_soup.find("input", {"name":"hTaskType0"})['value'])
-        # scanning due dates
 
         #this print the category and due date, make this into a list or table?
         for task in range(0, 19):
@@ -151,22 +146,15 @@ def create_packets():
             #compare dates and add due dates to a list
             #check list for comparison to see if something exists (lube, labs, af, etc)
             #if it exists, make a variable so it can be added to the work packet
-            #scheduled_task_item = due_task,due_date_str     
-            #scheduled_tasks.append(scheduled_task_item)
-        table_format(scheduled_tasks, scheduled_task_dates, 'Tasks Due', 'Due Date')
+        #table_format(scheduled_tasks, scheduled_task_dates, 'Tasks Due', 'Due Date')
 
-        #scheduled.append(list(zip(scheduled_tasks,scheduled_task_dates)))
         scheduled.append(list(scheduled_tasks))
         scheduled_date.append(list(scheduled_task_dates))
         scheduled_tasks.clear()
         scheduled_task_dates.clear()
-        #print(scheduled)
-        #print(scheduled_date)
-        #print(str(scheduled))
         # TS,LS,LB,1Y,2Y,N6,M5,M6,AF,EV,MR,CS,HB,AN,AB,RS, N2,N4,N5,M7,M2,M3,M5,RS(tape)
-        #maintenance_dates(scheduled_tasks, scheduled_task_dates)
 
-        print('FIXME: add ptc health to end of PTC line...add DP to report\n\n')
+        print('FIXME: add ptc health to end of PTC line...add DP to report\n')
         print('----',x,'----')
         if (soup.find("input", {"name":"hModel"})) is not None:
             model = soup.find("input", {"name":"hModel"})['value']
@@ -210,7 +198,6 @@ def create_packets():
             airFlow = soup.find("input", {"name:":"hNextFraAirFlowMeter"})['value'] 
         else:
             airFlow = '-'
-        
         locomotive_Info = x,date,fra,epa,'Y',csDue
         unitInfo.append(locomotive_Info)
 
@@ -224,26 +211,20 @@ def create_packets():
         urCover = load_workbook(filename="URPacketCover.xlsx")
         j = 0
         for info in unitInfo:
-            maint = input('Is '+info[0]+' a maintenance unit? (y/n) ')
+            print('\n|--------| '+info[0]+' |----------|\n')
+            table_format(scheduled[int(j)], scheduled_date[int(j)],'Task','Due Date')
+            maint = input('\nIs '+info[0]+' a maintenance unit? (y/n) ')
             if maint == "y" or maint == "Y":
                 print('Saving cover for Unit #: '+info[0]+'.')
                 packet = miCover.copy_worksheet(miCover["MI Cover Sheet"])
                 packet.title=info[0]
-                # trying to the new function
-                # maintenance_dates(scheduled_tasks, scheduled_task_dates, packet)
                 maintenance_dates(scheduled[int(j)], scheduled_date[int(j)],
                                  packet)
                 worksheet_tasks(packet, mi_starting_cell)
                 packet.cell(row=2, column=1).value = info[0]
                 packet.cell(row=1, column=6).value = info[1]
                 packet.cell(row=5, column=3).value = info[2]
-                #packet.cell(row=7, column=3).value = info[3]
-                #packet.cell(row=3, column=6).value = 'Y'
                 packet.cell(row=4, column=6).value = 'Y'
-                #packet.cell(row=5, column=6).value = 'Y'
-                #packet.cell(row=6, column=6).value = info[5]
-                #packet.cell(row=7, column=6).value = airFlow
-                #print(packet.cell(row=2, column=1).value)
                 j += 1
             elif maint == 'n' or maint == 'N':
                 print('Saving cover for Unit #: '+info[0]+'.')
@@ -254,19 +235,13 @@ def create_packets():
                 packet.cell(row=5, column=3).value = info[2]
                 maintenance_dates(scheduled[int(j)], scheduled_date[int(j)],
                                   packet)
-                #maintenance_dates(scheduled_tasks, scheduled_task_dates, packet)
                 worksheet_tasks(packet, ur_starting_cell)
                 packet.cell(row=4, column=6).value = 'Y'
                 j += 1
-                #print(packet.cell(row=2, column=1).value)               
         #del urCover['UR Cover Sheet']
-        #urCover.save('UR_Units_CoverSheets_'+curDate+'.xlsx')
         urCover.save('UR_CoverSheets.xlsx')
         #del miCover['MI Cover Sheet']
         miCover.save('MI_CoverSheets.xlsx')
-        # miCover.save('MI_Unit_CoverSheets_'+curDate+'.xlsx')
-        #mr = soup(text=re.compile('MR')))
-      
     menu()
 
 def scrape():
@@ -457,6 +432,10 @@ def writeMultColumns(row, column1, column2, robbed, paid):
     if emptyCol1 and emptyCol2 is None:
         emptyCol1 = t
         emptyCol2 = p
+
+def notes():
+    print('Notes placeholder')
+    menu()
 
 def readSingleColumn(rowStart, rowEnd, col):
     row_start = rowStart

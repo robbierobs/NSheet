@@ -1,16 +1,25 @@
+# LMIS Enola ITs hyperlink
+# LMIS Shop by reason https://www2.nscorp.com/mech0000/unitshopreason.lmis
+# LMIS Shop By Reason units
+# https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=
+# <a onclick="javascript:openNewWindow('Count','ENO','IT');"
+# style="cursor:pointer;">6</a>
+
 # Grab txt files for unit characteristics to make printing easier
 from datetime import datetime
 from datetime import date
 from datetime import timedelta
 from openpyxl import load_workbook
 from openpyxl import Workbook
-import requests
 from lxml import html
 from bs4 import BeautifulSoup
+from os import path
 import getpass
+import csv
 import os
 import sys
-#import re
+import shutil
+import requests
 
 today = date.today()
 curDate = today.strftime("%m-%d-%Y")
@@ -19,18 +28,53 @@ fromList = ' '
 wb = load_workbook(filename = 'Enola Powersheet 12-14-2019 1430.xlsx')
 #current_sheet = wb[curDate]
 current_sheet = wb['12-14-2019']
+locomotive_dictionary = {}
+
+locomotive_notes_date = 'locomotive_notes/'+curDate
+
+#   This populates the locomotive_dictionary variable with data that may be
+#   left behind after a crash or leaving the program
+if os.path.exists(locomotive_notes_date) is True:
+    #keep_old = input('Would you like to import the backup data? ')
+    keep_old = 'y'
+    if keep_old == 'y' or keep_old == 'Y':
+        found_files = [name for name in os.listdir(os.path.join(locomotive_notes_date)) if
+            os.path.isfile(os.path.join(locomotive_notes_date, name))]
+        for found in found_files:
+            if found not in locomotive_dictionary.keys():
+                with open(os.path.join(locomotive_notes_date, found), 'r') as f:
+                    found_loco_notes = [line.strip() for line in f]
+                    for lines in found_loco_notes:
+                        if found not in locomotive_dictionary.keys():
+                            locomotive_dictionary[found] = []
+                            locomotive_dictionary[found].append(lines)
+                        else:
+                            locomotive_dictionary[found].append(lines)
+
+locomotive_note_source='./locomotive_notes/'+curDate
+locomotive_note_backup='./locomotive_backup'
+
+if os.path.exists(locomotive_note_source):
+    #remove_backup_input = input('Would you like to delete the backup information? ')
+    remove_backup_input = 'y'
+    if remove_backup_input == 'y' or remove_backup_input == 'Y':
+        shutil.rmtree(locomotive_note_backup)
+        shutil.move(locomotive_note_source, locomotive_note_backup)
+#    os.rmdir(locomotive_notes_date)
+if os.path.exists(locomotive_notes_date) is False:
+    os.mkdir('locomotive_notes/'+curDate)
+
 
 #print('Currently working with the',curDate,'worksheet...')
 print('Using a static sheet currently')
-print('At the moment this is only being built for C-trick\n\n')
-print('Add a turnover function to automatically fill that out')
+print('At the moment this is only being built for C-trick')
+print('Add a turnover function to automatically fill that out\n\n')
 
 
 print("************-| LD_50 Locomotive Powersheet Mutilator |-**************")
 def menu():
 
     choice = input("""
-                
                 A: Inbound and Outbound Report
                 B: Outbound Trains
                 C: Change Powersheet
@@ -220,7 +264,7 @@ def create_packets():
                 packet.title=info[0]
                 maintenance_dates(scheduled[int(j)], scheduled_date[int(j)],
                                  packet)
-                worksheet_tasks(packet, mi_starting_cell)
+                worksheet_tasks(packet, mi_starting_cell, info[0])
                 packet.cell(row=2, column=1).value = info[0]
                 packet.cell(row=1, column=6).value = info[1]
                 packet.cell(row=5, column=3).value = info[2]
@@ -235,7 +279,7 @@ def create_packets():
                 packet.cell(row=5, column=3).value = info[2]
                 maintenance_dates(scheduled[int(j)], scheduled_date[int(j)],
                                   packet)
-                worksheet_tasks(packet, ur_starting_cell)
+                worksheet_tasks(packet, ur_starting_cell, info[0])
                 packet.cell(row=4, column=6).value = 'Y'
                 j += 1
         #del urCover['UR Cover Sheet']
@@ -326,10 +370,38 @@ def scrape():
 
     menu()
 
-def worksheet_tasks(packet, cell):
+def worksheet_tasks(packet, cell, loco_number):
     #ur=32 38 33 39
     work_list = []
     work_header = []
+
+    if loco_number in locomotive_dictionary.keys():
+    #for keys in locomotive_dictionary.keys():
+        print('Found it!!!')
+        for values in locomotive_dictionary[loco_number]:
+            print(values)
+            max_string_value = '%.20s' % values
+            add_to_work_packet = input('Would you like to add "'
+                                       +max_string_value+'" to the work packet?' )
+            if add_to_work_packet == 'y' or add_to_work_packet == 'Y':
+                dictionary_header = input('Enter a header for this task: ')
+                print('Adding to the packet.')
+                work_list.append(values)
+                work_header.append(dictionary_header)
+
+
+        #if loco_number in keys:
+            #print(locomotive_dictionary[loco_number])
+            #for key, value in locomotive_dictionary.items():
+            #   print (key, value)
+            #    add_to_work_packet = input('Would you like to add' +value+' to the work packet?')
+            #    if add_to_work_packet == 'y' or add_to_work_packet == 'Y':
+            #        dictionary_header = input('Enter a header for this task: ')
+            #        print('Adding to the packet.')
+            #        work_list.append(value)
+            #        work_header.append(dictionary_header)
+
+
     while True:
         header = input('Input worksheet header: ')
         if header == 'Q' or header =='q' or header == '':
@@ -366,6 +438,7 @@ def worksheet_tasks(packet, cell):
                 work_cell_iterator = int(work_cell_iterator) + 3
         print('Adding task: '+task)
         packet.cell(row=work_cell_iterator, column=2).value = task
+
 def maintenance_dates(tasks, due_dates, packet):
     mi_due_cell = packet.cell(row=6, column=3).value
     epa_due_cell = packet.cell(row=7, column=3).value
@@ -434,7 +507,52 @@ def writeMultColumns(row, column1, column2, robbed, paid):
         emptyCol2 = p
 
 def notes():
-    print('Notes placeholder')
+
+    print('\nFIXME: Add list of current notes on startup of this feature.')
+    print('\nFIXME: Add commands list to remind, D to delete notes,\n'+
+          'V to view list of current dictionary')
+    print('Current notes available for the following locomotives: ')
+    for key in locomotive_dictionary.keys():
+        print(key)
+    locomotive = input('\nEnter locomotive number: ')
+    if locomotive == '' or locomotive == 'q' or locomotive == 'Q':
+        print('Exiting.')
+    elif locomotive == 'del all':
+        locomotive_dictionary.clear()
+    elif locomotive in locomotive_dictionary:
+        print("Locomtive notes already exist. Adding to current notes...")
+        while True:
+            note = input('Enter note: ')
+            if note == '' or note == 'Q' or note == 'q':
+                print(locomotive_dictionary)
+                break
+            elif note == 'D' or note == 'del':
+                print('Deleting notes for locomotive', locomotive)
+                del locomotive_dictionary[locomotive]
+                break
+            elif note == 'V' or note =='v':
+                print(locomotive_dictionary[locomotive])
+            else:
+                locomotive_dictionary[locomotive].append(note)
+    else:
+        locomotive_dictionary[locomotive] = []
+        while True:
+            note = input('Enter note: ')
+            if note == '' or note == 'Q' or note == 'q':
+                print(locomotive_dictionary)
+                break
+            elif note == 'D':
+                print('Deleting notes for locomotive', locomotive)
+                del locomotive_dictionary[locomotive]
+                break
+            else:
+                locomotive_dictionary[locomotive].append(note)
+                #print(locomotive_dictionary)
+                if os.path.exists(locomotive_notes_date) is False:
+                    os.mkdir('locomotive_notes/'+curDate)
+                with open(os.path.join('locomotive_notes/'+curDate,locomotive), 'w', newline='') as loco_text:
+                    for notes in locomotive_dictionary[locomotive]:
+                        loco_text.write(notes+'\r\n')
     menu()
 
 def readSingleColumn(rowStart, rowEnd, col):
@@ -497,7 +615,8 @@ def table_format(list_one, list_two, label_one, label_two):
     for stuff, (row,column) in enumerate(zip(list_one, list_two)):
         print(fmt.format((stuff + 1), row, column))
         
-def table_format_three(list_one, list_two, list_three, label_one, label_two, label_three):
+def table_format_three(list_one, list_two, list_three,
+                       label_one, label_two, label_three):
     fmt = '{:<8}{:<20}{:<50}{}'
     print(fmt.format('', label_one, label_two, label_three))
     for stuff, (list_a, list_b, list_c) in enumerate(zip(list_one, list_two, list_three)):

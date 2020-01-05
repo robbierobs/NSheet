@@ -21,6 +21,9 @@ import sys
 import shutil
 import requests
 
+USERNAME = 'iywaa'
+PASSWORD = 'rky3gr74'
+
 today = date.today()
 curDate = today.strftime("%m-%d-%Y")
 fromList = ' '
@@ -87,7 +90,6 @@ def menu():
                 J: Scrape Unit Information (needs updated)
                 K: Locomotive Notes
 
-
                 Q: Quit/Log Out
 
                 Please enter your choice: """)
@@ -121,12 +123,9 @@ def menu():
         print("Please try again\n")
         menu()
 
-
-
 def create_packets():
-    USERNAME = input('\nLMIS Username: ')
-    PASSWORD = getpass.getpass('LMIS Password: ')
-
+#    USERNAME = input('\nLMIS Username: ')
+#    PASSWORD = getpass.getpass('LMIS Password: ')
     print('LD_50 Scrape')
     print('Author: Sean Robinson, SGL, Enola Diesel')
     print('Welcome to the LMIS Scraper...\n')
@@ -266,7 +265,7 @@ def create_packets():
                                  packet)
                 worksheet_tasks(packet, mi_starting_cell, info[0])
                 packet.cell(row=2, column=1).value = info[0]
-                packet.cell(row=1, column=6).value = info[1]
+                #packet.cell(row=1, column=6).value = info[1]
                 packet.cell(row=5, column=3).value = info[2]
                 packet.cell(row=4, column=6).value = 'Y'
                 j += 1
@@ -288,95 +287,14 @@ def create_packets():
         miCover.save('MI_CoverSheets.xlsx')
     menu()
 
-def scrape():
-    USERNAME = input('\nLMIS Username: ')
-    PASSWORD = getpass.getpass('LMIS Password: ')
-
-    print('LD_50 Scrape')
-    print('Author: Sean Robinson, SGL, Enola Diesel')
-    print('Welcome to the LMIS Scraper...\n')
-
-    UNIT_NUMBERS = input('Enter locomotive numbers separated by a space: ')
-    UNIT_LIST = UNIT_NUMBERS.split(" ")
-
-    # login page for LMIS
-    LOGIN_URL = "https://www2.nscorp.com/mech0000/login.lmis"
-
-    payload = {
-        "username": USERNAME, 
-        "pass1": PASSWORD, 
-    }
-
-    #URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=0000009952&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="    
-    
-    # keeps us logged into the session
-    session_requests = requests.session()
-    result = session_requests.get(LOGIN_URL)
-
-    # Login
-    result = session_requests.post(LOGIN_URL, data = payload, headers = dict(referer = LOGIN_URL))
-     
-    # Loop over the input list and scrape the work orders
-    for x in UNIT_LIST:
-    
-        LMIS_URL = "https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule="
-        result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
-        #with open("/home/robbie/Code/Work/"+x+".html", 'wb') as file:
-        #    file.write(result.content)
-
-        soup = BeautifulSoup(result.content, 'lxml')
-
-        # add PTC health when able
-        # add DP also
-
-        print('FIXME: add ptc health to end of PTC line...add DP to report\n\n')
-        print('----',x,'----')
-        if (soup.find("input", {"name":"hModel"})) is not None:
-            model = soup.find("input", {"name":"hModel"})['value']
-            print('Model: ' + model)
-        if (soup.find("input", {"name":"hPtc"})) is not None:
-            ptc = soup.find("input", {"name":"hPtc"})['value']
-            print('PTC: ' + ptc)
-        if (soup.find("input", {"name":"hEM"})) is not None:
-            em = soup.find("input", {"name":"hEM"})['value']
-            print('EM: ' + em)
-        if (soup.find("input", {"name":"hCs"})) is not None:
-            cabs = soup.find("input", {"name":"hCs"})['value']
-            print('CS: ' + cabs)
-        if (soup.find("input", {"name":"hLSL"})) is not None:
-            lsl = soup.find("input", {"name":"hLSL"})['value']
-            print('LSL: ' + lsl)
-        if (soup.find("input", {"name":"hRelIu"})) is not None:
-            relInd = soup.find("input", {"name":"hRelIu"})['value']
-            print('Reliability: ' + relInd)
-        if (soup.find("input", {"name":"hEquivAxl"})) is not None:
-            group = soup.find("input", {"name":"hEquivAxl"})['value']
-            print('Power Group: ' + group)
-        if (soup.find("input", {"name":"hPropDue"})) is not None:
-            fra = soup.find("input", {"name":"hPropDue"})['value']
-            print('FRA Due: ' + fra)
-        if (soup.find("input", {"name":"hEpaDead"})) is not None:
-            epa = soup.find("input", {"name":"hEpaDead"})['value']
-            print('EPA Due: ' + epa)
-        if (soup.find("input", {"name":"hLubeDue"})) is not None:
-            lube = soup.find("input", {"name":"hLubeDue"})['value']
-            print('Lube Due: ' + lube)
-        if (soup.find("input", {"name":"hCabS"})) is not None:
-            csDue = soup.find("input", {"name":"hCabS"})['value']
-            print('Cab Signals Due: ' + csDue)
-        if (soup.find("input", {"name":"hFc"})) is not None:
-            fuelCap = soup.find("input", {"name":"hFc"})['value']
-            print('Fuel Capacity: ' + fuelCap.lstrip("0"))
-
-    menu()
-
 def worksheet_tasks(packet, cell, loco_number):
-    #ur=32 38 33 39
     work_list = []
     work_header = []
 
+    #searching dictionary to see if notes exist for the engine
+    #if notes exist, prmopt to add the note to the packet
+
     if loco_number in locomotive_dictionary.keys():
-    #for keys in locomotive_dictionary.keys():
         print('Found it!!!')
         for values in locomotive_dictionary[loco_number]:
             print(values)
@@ -388,19 +306,6 @@ def worksheet_tasks(packet, cell, loco_number):
                 print('Adding to the packet.')
                 work_list.append(values)
                 work_header.append(dictionary_header)
-
-
-        #if loco_number in keys:
-            #print(locomotive_dictionary[loco_number])
-            #for key, value in locomotive_dictionary.items():
-            #   print (key, value)
-            #    add_to_work_packet = input('Would you like to add' +value+' to the work packet?')
-            #    if add_to_work_packet == 'y' or add_to_work_packet == 'Y':
-            #        dictionary_header = input('Enter a header for this task: ')
-            #        print('Adding to the packet.')
-            #        work_list.append(value)
-            #        work_header.append(dictionary_header)
-
 
     while True:
         header = input('Input worksheet header: ')
@@ -461,7 +366,7 @@ def maintenance_dates(tasks, due_dates, packet):
         packet.cell(row=5, column=6).value = 'Y'
     if '1Y' in tasks and '2Y' in tasks:
         #print('EPA: 1Y, 2Y')
-        packet.cell(row=7, column=3).value = epa_dua+'1Y, 2Y'
+        packet.cell(row=7, column=3).value = epa_due+'1Y, 2Y'
     elif '1Y' in tasks:
         #print('1Y EPA')
         packet.cell(row=7, column=3).value = epa_due+'1Y'
@@ -624,7 +529,6 @@ def table_format_three(list_one, list_two, list_three,
 
 def openEngines():
     print('\nSearching for Open Locomotives on Current Sheet.....')
-    
     inboundUnits=[]
     for rows in range (4, 27):
         row = current_sheet.cell(row=rows, column = 3).value
@@ -752,6 +656,8 @@ def remove_adjacent(seq): # works on any sequence, not just on numbers
             n -= 1
         else:
             i += 1
+def appendInbound():
+    print('Add function to change inbound power, search for maxes and update oubound sheets like the oteher function.')
 
 def appendBuild():
     print('\n|*************** Changing Power ***************|\n')

@@ -5,7 +5,6 @@
 # <a onclick="javascript:openNewWindow('Count','ENO','IT');"
 # style="cursor:pointer;">6</a>
 
-# Grab txt files for unit characteristics to make printing easier
 from datetime import datetime
 from datetime import date
 from datetime import timedelta
@@ -59,7 +58,7 @@ locomotive_note_backup='./locomotive_backup'
 
 if os.path.exists(locomotive_note_source):
     #remove_backup_input = input('Would you like to delete the backup information? ')
-    remove_backup_input = 'y'
+    remove_backup_input = 'n'
     if remove_backup_input == 'y' or remove_backup_input == 'Y':
         shutil.rmtree(locomotive_note_backup)
         shutil.move(locomotive_note_source, locomotive_note_backup)
@@ -72,7 +71,7 @@ if os.path.exists(locomotive_notes_date) is False:
 print('Using a static sheet currently')
 print('At the moment this is only being built for C-trick')
 print('Add a turnover function to automatically fill that out\n\n')
-
+print('FIXME:  3 monthers are not added correctly to work packet.')
 
 print("************-| LD_50 Locomotive Powersheet Mutilator |-**************")
 def menu():
@@ -99,7 +98,7 @@ def menu():
     elif choice == "B" or choice == "b":
         fromBuilt()
     elif choice == "C" or choice == "c":
-        appendBuild()
+        change_powersheet()
     elif choice == "D" or choice == "d":
         savePowersheet()
     elif choice == "E" or choice == "e":
@@ -122,7 +121,21 @@ def menu():
         print("You must only select either A,B,C,D,E,F,G or Q.")
         print("Please try again\n")
         menu()
+def change_powersheet():
+    change_sheet = input('''
+                A: Change Inbound Powersheet
+                B: Change Outbound Powersheet
+                C: Change Inbound Pit Sheet
+                D: Change Turnover Sheet
 
+                Please enter your choice:  ''')
+    if change_sheet == 'a' or change_sheet == 'A':
+        appendInbound()
+    elif change_sheet == 'b' or change_sheet == 'B':
+        appendBuild()
+    else:
+        print('FIXME:Other functions still need built.')
+        menu()
 def create_packets():
 #    USERNAME = input('\nLMIS Username: ')
 #    PASSWORD = getpass.getpass('LMIS Password: ')
@@ -155,9 +168,6 @@ def create_packets():
      
     # Loop over the input list and scrape the work orders
     for x in locomotive_list:
-        #locomotive_characteristics = ('https://www2.nscorp.com/mech0000/Locomotive?frame=frm&init=NS&nbr=9355&callingScreen=SHOPGRID')
-        #unit_information_report = ("https://www2.nscorp.com/mech0000/displayReports.lmis?nme=http://mechanical.nscorp.com/loc_Info/reports/Unit_Info_Reports/NS000000"+x+".txt")
-        #scheduled_maintenance_dates = ('https://www2.nscorp.com/mech0000/SmDueDates.lmis?action=S&callingScreen=OUTWRKOR&unitinit=NS&unitnumber=0000009355&inclsmi=N')
         #unit_in_shop_by_reason = ('https://www2.nscorp.com/mech0000/unitshopreason.lmis')
         #shop_it_units = ('https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=')
         LMIS_URL = ("https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule=")
@@ -189,8 +199,6 @@ def create_packets():
             #compare dates and add due dates to a list
             #check list for comparison to see if something exists (lube, labs, af, etc)
             #if it exists, make a variable so it can be added to the work packet
-        #table_format(scheduled_tasks, scheduled_task_dates, 'Tasks Due', 'Due Date')
-
         scheduled.append(list(scheduled_tasks))
         scheduled_date.append(list(scheduled_task_dates))
         scheduled_tasks.clear()
@@ -281,9 +289,7 @@ def create_packets():
                 worksheet_tasks(packet, ur_starting_cell, info[0])
                 packet.cell(row=4, column=6).value = 'Y'
                 j += 1
-        #del urCover['UR Cover Sheet']
         urCover.save('UR_CoverSheets.xlsx')
-        #del miCover['MI Cover Sheet']
         miCover.save('MI_CoverSheets.xlsx')
     menu()
 
@@ -334,7 +340,6 @@ def worksheet_tasks(packet, cell, loco_number):
     for task in work_list:
         work_cell_iterator = int(cell) + 1
         while packet.cell(row=work_cell_iterator, column=2).value is not None:
-            #print(work_cell_iterator)
             if work_cell_iterator == 33:
                 work_cell_iterator = int(work_cell_iterator) + 6
             elif work_cell_iterator == 34:
@@ -350,47 +355,34 @@ def maintenance_dates(tasks, due_dates, packet):
     epa_due = ''
     mi_due = ''
     if 'LS' in tasks:
-        #print('Samples due.')
         task_index = tasks.index('LS')
         packet.cell(row=3, column=6).value = 'Y'
     if 'AF' in tasks:
-        #print('Airflow due.')
         task_index = tasks.index('AF')
-        #air_flow = due_dates[task_index]
         packet.cell(row=7, column=6).value = 'Y'
     if 'CS' in tasks:
-        #print('Cabs due.')
         packet.cell(row=6, column=6).value = 'Y'
     if 'LB' in tasks:
-        #print('Lube due.')
         packet.cell(row=5, column=6).value = 'Y'
     if '1Y' in tasks and '2Y' in tasks:
-        #print('EPA: 1Y, 2Y')
         packet.cell(row=7, column=3).value = epa_due+'1Y, 2Y'
     elif '1Y' in tasks:
-        #print('1Y EPA')
         packet.cell(row=7, column=3).value = epa_due+'1Y'
     elif '2Y' in tasks:
-        #print('EPA: 2Y')
         packet.cell(row=7, column=3).value = epa_due+'2Y'
     if 'M5' in tasks:
-        #print('EPA: M5')
         packet.cell(row=7, column=3).value = epa_due+'M5'
     if 'M6' in tasks:
         packet.cell(row=7, column=3).value = epa_due+'M6'
-        #print('EPA: M6')
     if 'M7' in tasks:
         packet.cell(row=7, column=3).value = epa_due+'M7'
-        #print('EPA: M7')
     if 'N6' in tasks:
         packet.cell(row=7, column=3).value = epa_due+',N6'
     if 'MR' in tasks:
         packet.cell(row=6, column=3).value = '6mo'
     if 'AN' in tasks:
-        #print('12mo.')
         packet.cell(row=6, column=3).value = '12mo'
     if 'AB' in tasks:
-        #print('Air change.')
         packet.cell(row=6, column=3).value = packet.cell(row=6,
                                                          column=3).value+', Air'
 def writeMultColumns(row, column1, column2, robbed, paid):
@@ -412,20 +404,31 @@ def writeMultColumns(row, column1, column2, robbed, paid):
         emptyCol2 = p
 
 def notes():
+    # This function will allow you to take notes of whatever power you would
+    # like, this allows you to search power at the beginning of the shift, look
+    # them up throughout the shift and finally use the notes in the creation of
+    # work packets if need be.
 
-    print('\nFIXME: Add list of current notes on startup of this feature.')
-    print('\nFIXME: Add commands list to remind, D to delete notes,\n'+
-          'V to view list of current dictionary')
+    #print('\nFIXME: Add list of current notes on startup of this feature.')
+    #print('\nFIXME: Add commands list to remind, D to delete notes,\n'+
+    #      'V to view list of current dictionary')
     print('Current notes available for the following locomotives: ')
-    for key in locomotive_dictionary.keys():
-        print(key)
+    # To keep the locomotives ordered and immutable, we are going to use a
+    # dictionary. This allows key-value pairs that would be easier to search
+    # through and less likely to be corrupted compared to a list
+    #for key in locomotive_dictionary.keys():
+    #    print(key)
     locomotive = input('\nEnter locomotive number: ')
-    if locomotive == '' or locomotive == 'q' or locomotive == 'Q':
+    if locomotive == 'v' or locomotive ==  'V':
+        for key in locomotive_dictionary.keys():
+            print(key)
+    elif locomotive == '' or locomotive == 'q' or locomotive == 'Q':
         print('Exiting.')
     elif locomotive == 'del all':
         locomotive_dictionary.clear()
     elif locomotive in locomotive_dictionary:
         print("Locomtive notes already exist. Adding to current notes...")
+        print("(v) to view notes, (d) delete notes, (q) to exit")
         while True:
             note = input('Enter note: ')
             if note == '' or note == 'Q' or note == 'q':
@@ -554,13 +557,10 @@ def openEngines():
 
 def robPeter():
     print('\n|--------------- Robbing Peter ---------------|\n')
-    
     stolenTrain = input('What train are we stealing from?  ')
     stolenUnits = input('What units are being stolen?  ')
-
     stolenList = stolenUnits.split()
     print(stolenList)
-    
     payTrain = input('What train are we paying '+stolenTrain+' to? (ex. 15T - OUTBOUND)  ')
 
     #check inbound side for an empty slot to fill in the robbed train
@@ -643,8 +643,9 @@ def searchPower(newPower, fromRow):
                         units.append(a)
     remove_adjacent(units)
     fromList = (' / '.join(units))
-    print('From: ',fromList)
-    current_sheet.cell(row=row, column=21).value = fromList
+    return fromList
+    #print('From: ',fromList)
+    #current_sheet.cell(row=row, column=21).value = fromList
 
 def remove_adjacent(seq): # works on any sequence, not just on numbers
     i = 1
@@ -658,6 +659,40 @@ def remove_adjacent(seq): # works on any sequence, not just on numbers
             i += 1
 def appendInbound():
     print('Add function to change inbound power, search for maxes and update oubound sheets like the oteher function.')
+    print('\n|*************** Changing Power ***************|\n')
+
+    print('\n----------| Inbound Trains |------------\n')
+    inbound_train,inbound_power = readMultColumnsTable(4, 16, 1, 3)
+    table_format(inbound_train, inbound_power, 'Train Symbol', 'Power')
+    selectPower = input('\n\nWhat train would you like to change?  ')
+    # row will be the current row, we have to add 3 to get down to the correct cell
+ 
+    row = int(selectPower) + int(3)
+    old_build = current_sheet.cell(row=int(row), column=3).value
+    print('\n|---------- Appending build for',current_sheet.cell(row=row,column=1).value,'----------|\n')
+    print('Current build: ', old_build)
+    newBuild = input('New build:  ')
+    confirmBuild = input('You would like to change the build to: ' + newBuild + ' ? (y/n)  ')
+    if confirmBuild == 'y' or confirmBuild =="Y":
+        print('\nChanging power from ', old_build, ' to :', newBuild,' ')
+        current_sheet.cell(row=row, column=3).value = newBuild
+        print('Power changed to', current_sheet.cell(row=row, column=3).value, ' \n')
+        #Editing the "From" category on Outbound Trains
+        if newBuild == '' or newBuild == ' ' or newBuild == 'None':
+            newBuildValue = ' '
+            print('Removing build from ',selectPower+'.')
+            current_sheet.cell(row=row, column=21).value = ''
+        else:
+            newBuildValue = current_sheet.cell(row=row, column=3).value
+            print('Consist:',newBuildValue)
+            #Searches the inbound columns to find where power came from
+            foundPower = searchPower(newBuildValue, row)
+            current_sheet.cell(row=row, column=21).value = foundPower
+            print(current_sheet.cell(row=row, column=1).value,' changed to: ',newBuild, ' FROM:', current_sheet.cell(row=row, column=21).value, '\n')
+    else:
+        print('No changes made.\n')
+    menu()
+
 
 def appendBuild():
     print('\n|*************** Changing Power ***************|\n')
@@ -675,10 +710,8 @@ def appendBuild():
  
     row = int(selectPower) + int(3)
     old_build = current_sheet.cell(row=int(row), column=14).value
-    
     print('\n|---------- Appending build for',current_sheet.cell(row=row, column=12).value,'----------|\n')
     print('Current build: ', old_build)
-    
     newBuild = input('New build:  ')
     confirmBuild = input('You would like to change the build to: ' + newBuild + ' ? (y/n)  ')
 
@@ -686,15 +719,19 @@ def appendBuild():
         print('\nChanging power from ', old_build, ' to :', newBuild,' .')
         current_sheet.cell(row=row, column=14).value = newBuild
         print('Power changed to', current_sheet.cell(row=row, column=14).value, ' .\n')
-        
         #Editing the "From" category on Outbound Trains
-        newBuildValue = current_sheet.cell(row=row, column=14).value
-        print('Consist:',newBuildValue)
-        
-        #Searches the inbound columns to find where power came from
-        searchPower(newBuildValue, row)
-        print(current_sheet.cell(row=row, column=12).value,' changed to: ',newBuild, ' FROM:', current_sheet.cell(row=row, column=21).value, '.\n')
-        
+        if newBuild == '' or newBuild == ' ' or newBuild == 'None':
+            newBuildValue = ' '
+            print('Removing build from ',current_sheet.cell(row=row, column=12).value+'.')
+            current_sheet.cell(row=row, column=14).value = ''
+            current_sheet.cell(row=row, column=21).value = ''
+        else:
+            newBuildValue = current_sheet.cell(row=row, column=14).value
+            print('Consist:',newBuildValue)
+            #Searches the inbound columns to find where power came from
+            foundPower = searchPower(newBuildValue, row)
+            current_sheet.cell(row=row, column=21).value = foundPower
+            print(current_sheet.cell(row=row, column=12).value,' changed to: ',newBuild, ' FROM:', current_sheet.cell(row=row, column=21).value, '.\n')
     else:
         print('No changes made.\n')
     menu()
@@ -734,7 +771,7 @@ def fromBuilt():
     menu()
 
 def savePowersheet():
-    print('Saving workboot.....')
+    print('Saving workbook.....')
     #wb.save('/home/'+getpass.getuser()+'/Documents/test.xlsx')
     wb.template = False
     wb.save('test.xlsx')

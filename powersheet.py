@@ -101,6 +101,7 @@ def menu():
         change_powersheet()
     elif choice == "D" or choice == "d":
         savePowersheet()
+        menu()
     elif choice == "E" or choice == "e":
         robPeter()
     elif choice == "F" or choice == "f":
@@ -774,8 +775,16 @@ def savePowersheet():
     print('Saving workbook.....')
     #wb.save('/home/'+getpass.getuser()+'/Documents/test.xlsx')
     wb.template = False
-    wb.save('test.xlsx')
-    menu()
+    now = datetime. now()
+    current_time = now. strftime("%H%M")
+    wb.save('Enola Powersheet '+curDate+' '+current_time+'.xlsx')
+    #wb.save('test.xlsx')
+
+def newest(path):
+    files = os.listdir(path)
+    paths = [os.path.join(path, basename) for basename in files]
+    return max(paths, key=os.path.getctime)
+    #if basename.endswith('.csv')
 
 if __name__ == '__main__':
     menu()

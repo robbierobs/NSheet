@@ -20,9 +20,6 @@ import sys
 import shutil
 import requests
 
-USERNAME = 'iywaa'
-PASSWORD = 'rky3gr74'
-
 today = date.today()
 curDate = today.strftime("%m-%d-%Y")
 fromList = ' '
@@ -138,8 +135,8 @@ def change_powersheet():
         print('FIXME:Other functions still need built.')
         menu()
 def create_packets():
-#    USERNAME = input('\nLMIS Username: ')
-#    PASSWORD = getpass.getpass('LMIS Password: ')
+    USERNAME = input('\nLMIS Username: ')
+    PASSWORD = getpass.getpass('LMIS Password: ')
     print('LD_50 Scrape')
     print('Author: Sean Robinson, SGL, Enola Diesel')
     print('Welcome to the LMIS Scraper...\n')

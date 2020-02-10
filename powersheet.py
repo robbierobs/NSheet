@@ -5,6 +5,10 @@
 # <a onclick="javascript:openNewWindow('Count','ENO','IT');"
 # style="cursor:pointer;">6</a>
 
+# Lets create a database (SQLite) to keep track of employees (NSure),
+# locomotives, fuel, cs, dp, lsl, direction, etc. 
+
+import sqlite3
 from datetime import datetime
 from datetime import date
 from datetime import timedelta
@@ -63,6 +67,8 @@ if os.path.exists(locomotive_note_source):
 if os.path.exists(locomotive_notes_date) is False:
     os.mkdir('locomotive_notes/'+curDate)
 
+conn = sqlite3.connect('enola_database.db')
+c = conn.cursor()
 
 #print('Currently working with the',curDate,'worksheet...')
 print('Using a static sheet currently')
@@ -105,6 +111,7 @@ def menu():
         payPaul()
     elif choice == 'G' or choice == 'g':
         openEngines()
+        menu()
     elif choice == 'H' or choice == 'h':
         shoppers()
     elif choice == 'I' or choice == 'i':
@@ -135,8 +142,10 @@ def change_powersheet():
         print('FIXME:Other functions still need built.')
         menu()
 def create_packets():
-    USERNAME = input('\nLMIS Username: ')
-    PASSWORD = getpass.getpass('LMIS Password: ')
+    #USERNAME = input('\nLMIS Username: ')
+    #PASSWORD = getpass.getpass('LMIS Password: ')
+    USERNAME = 'iywaa'
+    PASSWORD = 'rky3gr74'
     print('LD_50 Scrape')
     print('Author: Sean Robinson, SGL, Enola Diesel')
     print('Welcome to the LMIS Scraper...\n')
@@ -166,18 +175,18 @@ def create_packets():
      
     # Loop over the input list and scrape the work orders
     for x in locomotive_list:
-        #unit_in_shop_by_reason = ('https://www2.nscorp.com/mech0000/unitshopreason.lmis')
-        #shop_it_units = ('https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=')
+        # unit_in_shop_by_reason = ('https://www2.nscorp.com/mech0000/unitshopreason.lmis')
+        # shop_it_units = ('https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=')
         LMIS_URL = ("https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule=")
         scheduled_dates_url ="https://www2.nscorp.com/mech0000/SmDueDates.lmis?action=S&callingScreen=OUTWRKOR&unitinit=NS&unitnumber=000000"+x+"&inclsmi=N"
         result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
         scheduled_result = session_requests.get(scheduled_dates_url, headers = dict(referer = scheduled_dates_url))
 
-        #unit_result = session_requests.get(unit_information_report, headers = dict(referer = unit_information_report))
+        # unit_result = session_requests.get(unit_information_report, headers = dict(referer = unit_information_report))
         soup = BeautifulSoup(result.content, 'lxml')
         scheduled_soup = BeautifulSoup(scheduled_result.content, 'lxml')
 
-        #unit_soup = BeautifulSoup(unit_result.content, 'lxml')
+        # unit_soup = BeautifulSoup(unit_result.content, 'lxml')
 
         # add PTC health when able
         # add DP also
@@ -208,33 +217,53 @@ def create_packets():
         if (soup.find("input", {"name":"hModel"})) is not None:
             model = soup.find("input", {"name":"hModel"})['value']
             print('Model: ' + model)
+        else:
+            model = '-'
         if (soup.find("input", {"name":"hPtc"})) is not None:
             ptc = soup.find("input", {"name":"hPtc"})['value']
             print('PTC: ' + ptc)
+        else:
+            ptc = '-'
         if (soup.find("input", {"name":"hEM"})) is not None:
             em = soup.find("input", {"name":"hEM"})['value']
             print('EM: ' + em)
+        else:
+            em = '-'
         if (soup.find("input", {"name":"hCs"})) is not None:
             cabs = soup.find("input", {"name":"hCs"})['value']
             print('CS: ' + cabs)
+        else:
+            cabs = '-'
         if (soup.find("input", {"name":"hLSL"})) is not None:
             lsl = soup.find("input", {"name":"hLSL"})['value']
             print('LSL: ' + lsl)
+        else:
+            lsl = '-'
         if (soup.find("input", {"name":"hRelIu"})) is not None:
             relInd = soup.find("input", {"name":"hRelIu"})['value']
             print('Reliability: ' + relInd)
+        else:
+            relInd = '-'
         if (soup.find("input", {"name":"hEquivAxl"})) is not None:
             group = soup.find("input", {"name":"hEquivAxl"})['value']
             print('Power Group: ' + group)
+        else:
+            group = '-'
         if (soup.find("input", {"name":"hPropDue"})) is not None:
             fra = soup.find("input", {"name":"hPropDue"})['value']
             print('FRA Due: ' + fra)
+        else:
+            fra = '-'
         if (soup.find("input", {"name":"hEpaDead"})) is not None:
             epa = soup.find("input", {"name":"hEpaDead"})['value']
             print('EPA Due: ' + epa)
+        else:
+            epa = '-'
         if (soup.find("input", {"name":"hLubeDue"})) is not None:
             lube = soup.find("input", {"name":"hLubeDue"})['value']
             print('Lube Due: ' + lube)
+        else:
+            lube = '-'
         if (soup.find("input", {"name":"hCabS"})) is not None:
             csDue = soup.find("input", {"name":"hCabS"})['value']
             print('Cab Signals Due: ' + csDue)
@@ -242,19 +271,35 @@ def create_packets():
             csDue = '-'
         if (soup.find("input", {"name":"hFc"})) is not None:
             fuelCap = soup.find("input", {"name":"hFc"})['value']
-            print('Fuel Capacity: ' + fuelCap.lstrip("0"))
-        if (soup.find("input", {"name:":"hNextFraAirFlowMeter"})) is not None:
-            airFlow = soup.find("input", {"name:":"hNextFraAirFlowMeter"})['value'] 
+            fuel_capacity = fuelCap.lstrip("0")
+            print('Fuel Capacity: ' + fuel_capacity)
+        else:
+            fuelCap = '-'
+        if (soup.find("input", {"name":"hNextFraAirFlowMeter"})) is not None:
+            airFlow = soup.find("input", {"name":"hNextFraAirFlowMeter"})['value'] 
         else:
             airFlow = '-'
         locomotive_Info = x,date,fra,epa,'Y',csDue
+        unit_num = int(x)
+        #
+        # current fuel placeholder
+        # Eventually this command will need to be replaced to only insert the
+        # correct values, this was built as a test for now and will be used
+        # accordingly until SQL data can be pulled from another database or
+        # until I leave them blank to be inputted to other 
+        #
+        current_date_time = datetime.today()
+        cur_fuel = 9999
+        c.execute("INSERT OR REPLACE INTO enoladb VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                 (x, model, cabs, lsl, fra, epa, lube, csDue, airFlow,
+                  fuel_capacity, cur_fuel, '?', '?',current_date_time.strftime("%m-%d-%Y %H:%M:%S")))
+        conn.commit()
         unitInfo.append(locomotive_Info)
-
 
 
     correctInfo=input("\nIs the information correct? (y/n) ")
     if correctInfo == 'y' or correctInfo == 'Y':
-        mi_starting_cell = 24
+        mi_starting_cell = 25
         ur_starting_cell = 23
         miCover = load_workbook(filename="MIPacketCover.xlsx")
         urCover = load_workbook(filename="URPacketCover.xlsx")
@@ -551,7 +596,6 @@ def openEngines():
 
     openUnits = [s for s in inboundUnits if s not in usedUnits]
     print('Search complete...\n\nOpen Locomtovies:',openUnits,'\n')
-    menu()
 
 def robPeter():
     print('\n|--------------- Robbing Peter ---------------|\n')
@@ -708,6 +752,7 @@ def appendBuild():
  
     row = int(selectPower) + int(3)
     old_build = current_sheet.cell(row=int(row), column=14).value
+    openEngines()
     print('\n|---------- Appending build for',current_sheet.cell(row=row, column=12).value,'----------|\n')
     print('Current build: ', old_build)
     newBuild = input('New build:  ')
@@ -783,5 +828,20 @@ def newest(path):
     return max(paths, key=os.path.getctime)
     #if basename.endswith('.csv')
 
+def create_database():
+    c.execute('CREATE TABLE IF NOT EXISTS enoladb (unit_number INTEGER UNIQUE,\
+              model TEXT, cab_signals TEXT, lsl TEXT, fra_date TEXT, epa_date\
+              TEXT, lube_due TEXT, cabs_due TEXT, afm_due TEXT, fuel_cap TEXT,\
+              current_fuel TEXT, ptc_status TEXT, direction TEXT, updated TEXT)')
+
+def database_entry():
+    
+    c.execute("INSERT INTO database_name (\
+        keyword_one, keyword_two, keyword_three, keyword_four, keywork_five)\
+        VALUES (?, ?, ?, ?, ?)", (key_val, to_val, add_val, data_val))
+    conn.commit()
+
 if __name__ == '__main__':
+    create_database()
     menu()
+    conn.close()

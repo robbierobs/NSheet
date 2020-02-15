@@ -25,6 +25,7 @@ import shutil
 import requests
 
 current_date_time = datetime.today()
+recorded_time = current_date_time.strftime("%m-%d-%Y %H:%M:%S")
 today = date.today()
 curDate = today.strftime("%m-%d-%Y")
 fromList = ' '
@@ -284,20 +285,43 @@ def create_packets():
             airFlow = soup.find("input", {"name":"hNextFraAirFlowMeter"})['value'] 
         else:
             airFlow = '-'
+        if (soup.find("input", {"name":"hHomeShpCd"})) is not None:
+            home = soup.find("input", {"name":"hHomeShpCd"})['value'] 
+        else:
+            home = '-'
+        if (soup.find("input", {"name":"hAltrShpCd"})) is not None:
+            alt = soup.find("input", {"name":"hAltrShpCd"})['value'] 
+        else:
+            alt = '-'
+ 
+
+        # if statement that has assigned engine in the mix.
+        # We can use this to aid in automatically populating the inbound
+        # turnover sheet.
+
         locomotive_Info = x,date,fra,epa,'Y',csDue
         unit_num = int(x)
         
-        # current fuel placeholder
         # Eventually this command will need to be replaced to only insert the
         # correct values, this was built as a test for now and will be used
         # accordingly until SQL data can be pulled from another database or
         # until I leave them blank to be inputted to other 
-        
-        #current_date_time = datetime.today()
-        c.execute("INSERT OR REPLACE INTO enoladb (unit_number, model, cab_signals, lsl, fra_date, epa_date, lube_due, cs_due, afm_due, fuel_capacity, updated) VALUES  (?,?,?,?,?,?,?,?,?,?,?)", 
-                  (x, model, cabs, lsl, fra, epa, lube, csDue, airFlow, 
-                   fuel_capacity,
-                   current_date_time.strftime("%m-%d-%Y %H:%M:%S")))
+
+        c.execute("INSERT INTO enoladb (unit_number, model, cab_signals, lsl,\
+                  fra_date, epa_date, lube_due, cs_due, afm_due,\
+                  fuel_capacity, updated, home_shop, alt_shop) VALUES\
+                  (?,?,?,?,?,?,?,?,?,?,?,?,?)\
+                  ON CONFLICT(unit_number) DO UPDATE SET \
+                  fra_date=excluded.fra_date,\
+                  epa_date=excluded.epa_date,\
+                  lube_due=excluded.lube_due,\
+                  cs_due=excluded.cs_due,\
+                  afm_due=excluded.afm_due,\
+                  updated=excluded.updated,\
+                  home_shop=excluded.home_shop,\
+                  alt_shop=excluded.alt_shop;",
+                  (x,model,cabs,lsl,fra,epa,lube,csDue,airFlow,fuel_capacity,\
+                   recorded_time,home,alt))
  
         conn.commit()
         unitInfo.append(locomotive_Info)
@@ -838,15 +862,7 @@ def create_database():
               model TEXT, cab_signals TEXT, lsl TEXT, fra_Date TEXT, epa_date\
               TEXT, lube_due TEXT, cs_due TEXT, afm_due TEXT, fuel_capacity\
               TEXT,incoming_fuel TEXT, current_fuel TEXT, ptc_status TEXT, \
-              direction TEXT UNIQUE,\
-              updated TEXT)')
-
-def database_entry():
-    
-    c.execute("INSERT INTO database_name (\
-        keyword_one, keyword_two, keyword_three, keyword_four, keywork_five)\
-        VALUES (?, ?, ?, ?, ?)", (key_val, to_val, add_val, data_val))
-    conn.commit()
+              direction TEXT, updated TEXT, home_shop TEXT, alt_shop TEXT)')
 
 def rundown():
     while True:
@@ -863,17 +879,30 @@ def rundown():
                 direction = unit[-1]
             fuel_level = input('Fuel level: ')
             if direction == '-':
-                c.execute("INSERT OR REPLACE INTO enoladb \
-                          (unit_number, incoming_fuel, updated) VALUES  (?,?,?)",
-                    (unit_number,fuel_level,
-                    current_date_time.strftime("%m-%d-%Y %H:%M:%S")))
+               fuel_db_update(unit_number, fuel_level)
             else:
-                c.execute("INSERT OR REPLACE INTO enoladb (unit_number,\
-                          incoming_fuel,direction, updated) VALUES  (?,?,?,?)",
-                    (unit_number,fuel_level, direction,
-                    current_date_time.strftime("%m-%d-%Y %H:%M:%S")))
-            conn.commit()
+                full_rundown(unit_number, fuel_level, direction)
 
+def fuel_db_update(unit, fuel):
+    c.execute("INSERT INTO enoladb (unit_number,\
+        incoming_fuel, updated) VALUES (?,?,?)\
+        ON CONFLICT(unit_number) DO UPDATE SET \
+        incoming_fuel=excluded.incoming_fuel,\
+        updated=excluded.updated;",\
+        (unit,fuel,recorded_time))
+    conn.commit()
+ 
+
+def full_rundown(unit, fuel, direct):
+    c.execute("INSERT INTO enoladb (unit_number,\
+        incoming_fuel, direction, updated) VALUES (?,?,?,?)\
+        ON CONFLICT(unit_number) DO UPDATE SET \
+        incoming_fuel=excluded.incoming_fuel,\
+        direction=excluded.direction,\
+        updated=excluded.updated;",\
+        (unit,fuel,direct,recorded_time))
+    conn.commit()
+           
 if __name__ == '__main__':
     create_database()
     menu()

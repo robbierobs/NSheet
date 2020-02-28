@@ -21,7 +21,7 @@ This program is built to aid the Enola Diesel Shop dispatch position at inbound.
 	* bs4
 	* getpass
 	* shutil
-3. Execute main program by running **python3 powersheet.py**
+3. Execute main program by running `python3 powersheet.py`
 
 ## Usage
 

@@ -1,12 +1,18 @@
-# LMIS Enola ITs hyperlink
-# LMIS Shop by reason https://www2.nscorp.com/mech0000/unitshopreason.lmis
-# LMIS Shop By Reason units
-# https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=
-# <a onclick="javascript:openNewWindow('Count','ENO','IT');"
-# style="cursor:pointer;">6</a>
-
-# Lets create a database (SQLite) to keep track of employees (NSure),
-# locomotives, fuel, cs, dp, lsl, direction, etc. 
+#######################################
+#
+# Powersheet Aid for Enola Diesel Shop.
+# Author: Sean Robinson, SGL Dispatch
+#
+#
+# This program is to aid the current supervisors and SGL working the powerdesk
+# at Enola Diesel. It will allow us to work from a minimal amount of screens
+# and also aid in the redudancy of recording information. The program has the
+# ability to manipulate Excel sheets, save information to a SQLite database and
+# will eventually work side-by-side an additional program that will aid in the
+# workforce in recording inbound/outbound information on units.
+#
+#
+#######################################
 
 import sqlite3
 from datetime import datetime
@@ -23,6 +29,8 @@ import os
 import sys
 import shutil
 import requests
+
+# Setting global variables such as dates, times, workbook
 
 current_date_time = datetime.today()
 recorded_time = current_date_time.strftime("%m-%d-%Y %H:%M:%S")
@@ -71,6 +79,11 @@ if os.path.exists(locomotive_notes_date) is False:
 
 conn = sqlite3.connect('enola_database.db')
 c = conn.cursor()
+
+
+# Currently the program is set to only work with a static workbook at this time
+# to help aid in the development. As the program progresses, we will work from
+# a current live sheet
 
 #print('Currently working with the',curDate,'worksheet...')
 print('Using a static sheet currently')
@@ -132,6 +145,11 @@ def menu():
         print("You must only select either A,B,C,D,E,F,G or Q.")
         print("Please try again\n")
         menu()
+
+
+# Secondary menu selection on changing the powersheet. This allows us to
+# condense the menu a little.
+
 def change_powersheet():
     change_sheet = input('''
                 A: Change Inbound Powersheet
@@ -181,14 +199,11 @@ def create_packets():
      
     # Loop over the input list and scrape the work orders
     for x in locomotive_list:
-        # unit_in_shop_by_reason = ('https://www2.nscorp.com/mech0000/unitshopreason.lmis')
-        # shop_it_units = ('https://www2.nscorp.com/mech0000/unitshopreasonitdetail.lmis?Shop=ENO&Reason=')
         LMIS_URL = ("https://www2.nscorp.com/mech0000/OutstandingWorkOrders.lmis?pageprocess=VT&locoinit=NS&loconbr=000000"+x+"&notfromshp=N&readonly=N&shop=%20%20%20&attachonly=N&updateact=N&searchbox=Y&reqFromModule=")
         scheduled_dates_url ="https://www2.nscorp.com/mech0000/SmDueDates.lmis?action=S&callingScreen=OUTWRKOR&unitinit=NS&unitnumber=000000"+x+"&inclsmi=N"
         result = session_requests.get(LMIS_URL, headers = dict(referer = LMIS_URL))
         scheduled_result = session_requests.get(scheduled_dates_url, headers = dict(referer = scheduled_dates_url))
 
-        # unit_result = session_requests.get(unit_information_report, headers = dict(referer = unit_information_report))
         soup = BeautifulSoup(result.content, 'lxml')
         scheduled_soup = BeautifulSoup(scheduled_result.content, 'lxml')
 
@@ -200,7 +215,7 @@ def create_packets():
         # items are hidden on the due dates page
         # they are not static and will have to be searched through
 
-        #this print the category and due date, make this into a list or table?
+        # Print the category and due date, make this into a list or table?
         for task in range(0, 19):
             due_task = scheduled_soup.find("input", {"name":"hTaskType"+str(task)})['value']
             due_date_str = scheduled_soup.find("input", {"name":"hNextDueDate"+str(task)})['value']
@@ -220,6 +235,11 @@ def create_packets():
 
         print('FIXME: add ptc health to end of PTC line...add DP to report\n')
         print('----',x,'----')
+        
+        # Each if statement is used to search for specific information on the
+        # LMIS website. If this information is found, it is stored in a
+        # variable. If it is NOT found, a dash will take its place
+
         if (soup.find("input", {"name":"hModel"})) is not None:
             model = soup.find("input", {"name":"hModel"})['value']
             print('Model: ' + model)
@@ -369,8 +389,8 @@ def worksheet_tasks(packet, cell, loco_number):
     work_list = []
     work_header = []
 
-    #searching dictionary to see if notes exist for the engine
-    #if notes exist, prmopt to add the note to the packet
+    # Searching dictionary to see if notes exist for the engine
+    # If notes exist, prmopt to add the note to the packet
 
     if loco_number in locomotive_dictionary.keys():
         print('Found it!!!')
@@ -864,6 +884,10 @@ def create_database():
               TEXT,incoming_fuel TEXT, current_fuel TEXT, ptc_status TEXT, \
               direction TEXT, updated TEXT, home_shop TEXT, alt_shop TEXT)')
 
+def outbound_plan():
+    print('test function')
+
+
 def rundown():
     while True:
         unit = input('Input unit number(with or without direction): ')
@@ -891,7 +915,6 @@ def fuel_db_update(unit, fuel):
         updated=excluded.updated;",\
         (unit,fuel,recorded_time))
     conn.commit()
- 
 
 def full_rundown(unit, fuel, direct):
     c.execute("INSERT INTO enoladb (unit_number,\
@@ -902,7 +925,7 @@ def full_rundown(unit, fuel, direct):
         updated=excluded.updated;",\
         (unit,fuel,direct,recorded_time))
     conn.commit()
-           
+
 if __name__ == '__main__':
     create_database()
     menu()

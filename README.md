@@ -1,4 +1,4 @@
-# powersheetMutilator
+# NSheet
 
 This program is built to aid the Enola Diesel Shop dispatch position at inbound. By using python and some libraries, we can use this program to manage the excel sheets that are required for the position, all from one source. This will allow the dispatch position to be much more fluid and more efficient.
 
